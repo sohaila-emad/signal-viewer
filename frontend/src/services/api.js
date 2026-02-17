@@ -40,7 +40,67 @@ export const medicalAPI = {
 
 export const acousticAPI = {
   test: () => api.get('/acoustic/test'),
-  generateDoppler: (data) => api.post('/acoustic/generate', data),
+  generateDoppler: (data) => api.post('/acoustic/doppler/generate', data),
+  getDopplerParameters: (velocity, frequency) => 
+    api.get('/acoustic/doppler/parameters', { params: { velocity, frequency } }),
+  analyzeVehicle: (audioData, sampleRate) => 
+    api.post('/acoustic/vehicle/analyze', { audio_data: audioData, sample_rate: sampleRate }),
+  detectVehicle: (audioData, sampleRate, vehicleType) => 
+    api.post('/acoustic/vehicle/detect', { 
+      audio_data: audioData, 
+      sample_rate: sampleRate,
+      vehicle_type: vehicleType 
+    }),
+  computeSpectrogram: (audioData, sampleRate, nperseg) => 
+    api.post('/acoustic/spectrogram', { 
+      audio_data: audioData, 
+      sample_rate: sampleRate,
+      nperseg: nperseg || 256 
+    }),
+};
+
+export const stockAPI = {
+  // Stock data
+  getStockData: (symbol, period = '1y', interval = '1d') => 
+    api.get(`/stock/data/${symbol}`, { params: { period, interval } }),
+  getStockInfo: (symbol) => api.get(`/stock/info/${symbol}`),
+  getStockList: (category = 'tech') => api.get(`/stock/list/${category}`),
+  
+  // Currency data
+  getCurrencyList: (category = 'major') => api.get(`/stock/currency/list/${category}`),
+  getCurrencyData: (symbol, period = '1y', interval = '1d') => 
+    api.get(`/stock/currency/data/${symbol}`, { params: { period, interval } }),
+  
+  // Mineral/commodity data
+  getMineralList: (category = 'precious') => api.get(`/stock/mineral/list/${category}`),
+  getMineralData: (symbol, period = '1y', interval = '1d') => 
+    api.get(`/stock/mineral/data/${symbol}`, { params: { period, interval } }),
+  
+  // Prediction
+  predictStock: (symbol, method = 'sma', nDays = 7) => 
+    api.get(`/stock/predict/${symbol}`, { params: { method, n_days: nDays } }),
+  
+  // Technical analysis
+  getTechnicalAnalysis: (symbol) => api.get(`/stock/analysis/${symbol}`),
+  
+  // Comparison
+  compareStocks: (symbols, period = '1y') => 
+    api.post('/stock/compare', { symbols, period }),
+  
+  // Market summary
+  getMarketSummary: () => api.get('/stock/market/summary'),
+};
+
+export const microbiomeAPI = {
+  // Sample management
+  getSamples: () => api.get('/microbiome/'),
+  getSample: (sampleId) => api.get(`/microbiome/${sampleId}`),
+  createSample: (data) => api.post('/microbiome/', data),
+  deleteSample: (sampleId) => api.delete(`/microbiome/${sampleId}`),
+  
+  // Analysis
+  analyzeDiversity: (samples) => 
+    api.post('/microbiome/analyze-diversity', { samples }),
 };
 
 export default api;

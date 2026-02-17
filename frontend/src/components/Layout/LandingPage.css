@@ -1,6 +1,6 @@
 .landing-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #b91083 0%, #96058a 100%);
   position: relative;
   overflow: hidden;
 }
@@ -88,13 +88,13 @@
 
 .type-button.active {
   background: white;
-  color: #667eea;
+  color: #b910a5;
   border-color: white;
   box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
 .type-button.active .type-icon {
-  color: #667eea;
+  color: #b9108c;
 }
 
 .type-icon {
@@ -141,7 +141,7 @@
   padding: 12px 30px;
   font-size: 1.1rem;
   background: white;
-  color: #667eea;
+  color: #b91097;
   border: none;
   border-radius: 50px;
   cursor: pointer;
@@ -234,7 +234,7 @@
 
 .sample-button:hover {
   background: white;
-  color: #667eea;
+  color: #b91091;
   transform: translateY(-2px);
 }
 

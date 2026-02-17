@@ -21,11 +21,15 @@ def create_app():
     # Register blueprints
     from .routes.medical_routes import medical_bp
     from .routes.acoustic_routes import acoustic_bp
-    from .routes.upload_routes import upload_bp  # Add this
+    from .routes.upload_routes import upload_bp
+    from .routes.stock_routes import stock_bp
+    from .routes.microbiome_routes import microbiome_bp
     
     app.register_blueprint(medical_bp, url_prefix='/api/medical')
     app.register_blueprint(acoustic_bp, url_prefix='/api/acoustic')
-    app.register_blueprint(upload_bp, url_prefix='/api')  # Add this
+    app.register_blueprint(upload_bp, url_prefix='/api')
+    app.register_blueprint(stock_bp, url_prefix='/api/stock')
+    app.register_blueprint(microbiome_bp, url_prefix='/api/microbiome')
     
     @app.route('/')
     def index():

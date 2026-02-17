@@ -7,7 +7,11 @@ import SignalInfo from './components/Layout/SignalInfo';
 import XORViewer from './components/Viewers/XORViewer';
 import PolarViewer from './components/Viewers/PolarViewer';
 import RecurrenceViewer from './components/Viewers/RecurrenceViewer';
+import AcousticPage from './components/Pages/AcousticPage';
+import StockPage from './components/Pages/StockPage';
+import MicrobiomePage from './components/Pages/MicrobiomePage';
 import './App.css';
+
 
 function App() {
   const [signalData, setSignalData] = useState(null);
@@ -191,65 +195,77 @@ function App() {
               )}
             </div>
             
-            {/* Main Viewer Area */}
+            {/* Main Viewer Area - Show different pages based on activeTab */}
             <div className="viewer-area">
-              {signalData ? (
-                <div className="viewer-container">
-                  {/* Quick Stats Bar */}
-                  <div className="stats-bar">
-                    <div className="stat-item">
-                      <span className="stat-label">File</span>
-                      <span className="stat-value">{signalData.filename}</span>
+              {/* Show AcousticPage when activeTab is acoustic */}
+              {activeTab === 'acoustic' && <AcousticPage />}
+              
+              {/* Show StockPage when activeTab is stock */}
+              {activeTab === 'stock' && <StockPage />}
+              
+              {/* Show MicrobiomePage when activeTab is microbiome */}
+              {activeTab === 'microbiome' && <MicrobiomePage />}
+              
+              {/* Show standard medical viewers when activeTab is medical */}
+              {activeTab === 'medical' && (
+                signalData ? (
+                  <div className="viewer-container">
+                    {/* Quick Stats Bar */}
+                    <div className="stats-bar">
+                      <div className="stat-item">
+                        <span className="stat-label">File</span>
+                        <span className="stat-value">{signalData.filename}</span>
+                      </div>
+                      <div className="stat-divider">|</div>
+                      <div className="stat-item">
+                        <span className="stat-label">Channels</span>
+                        <span className="stat-value">{signalData.channels}</span>
+                      </div>
+                      <div className="stat-divider">|</div>
+                      <div className="stat-item">
+                        <span className="stat-label">Sampling Rate</span>
+                        <span className="stat-value">{signalData.fs} Hz</span>
+                      </div>
+                      <div className="stat-divider">|</div>
+                      <div className="stat-item">
+                        <span className="stat-label">Samples</span>
+                        <span className="stat-value">{signalData.time?.length || 0}</span>
+                      </div>
+                      <div className="stat-divider">|</div>
+                      <div className="stat-item">
+                        <span className="stat-label">Type</span>
+                        <span className="stat-value type-badge">{signalData.type || 'medical'}</span>
+                      </div>
                     </div>
-                    <div className="stat-divider">|</div>
-                    <div className="stat-item">
-                      <span className="stat-label">Channels</span>
-                      <span className="stat-value">{signalData.channels}</span>
-                    </div>
-                    <div className="stat-divider">|</div>
-                    <div className="stat-item">
-                      <span className="stat-label">Sampling Rate</span>
-                      <span className="stat-value">{signalData.fs} Hz</span>
-                    </div>
-                    <div className="stat-divider">|</div>
-                    <div className="stat-item">
-                      <span className="stat-label">Samples</span>
-                      <span className="stat-value">{signalData.time?.length || 0}</span>
-                    </div>
-                    <div className="stat-divider">|</div>
-                    <div className="stat-item">
-                      <span className="stat-label">Type</span>
-                      <span className="stat-value type-badge">{signalData.type || 'medical'}</span>
-                    </div>
-                  </div>
 
-                  {/* Viewer */}
-                  <div className="viewer-wrapper">
-                    {viewType === 'continuous' && <ContinuousViewer data={signalData} />}
-                    {viewType === 'xor' && <XORViewer data={signalData} />}
-                    {viewType === 'polar' && <PolarViewer data={signalData} />}
-                    {viewType === 'recurrence' && <RecurrenceViewer data={signalData} />}
-                  </div>
-
-                  {/* AI Prediction (for medical signals) */}
-                  {activeTab === 'medical' && signalData && (
-                    <div className="ai-section">
-                      <AIPrediction signalData={signalData} />
+                    {/* Viewer */}
+                    <div className="viewer-wrapper">
+                      {viewType === 'continuous' && <ContinuousViewer data={signalData} />}
+                      {viewType === 'xor' && <XORViewer data={signalData} />}
+                      {viewType === 'polar' && <PolarViewer data={signalData} />}
+                      {viewType === 'recurrence' && <RecurrenceViewer data={signalData} />}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="no-data">
-                  <div className="no-data-icon">📊</div>
-                  <h2>No data loaded</h2>
-                  <p>Upload a file from the sidebar to start visualization</p>
-                  <button 
-                    className="upload-prompt-btn"
-                    onClick={handleBackToUpload}
-                  >
-                    Go to Upload Page
-                  </button>
-                </div>
+
+                    {/* AI Prediction (for medical signals) */}
+                    {signalData && (
+                      <div className="ai-section">
+                        <AIPrediction signalData={signalData} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="no-data">
+                    <div className="no-data-icon">📊</div>
+                    <h2>No data loaded</h2>
+                    <p>Upload a file from the sidebar to start visualization</p>
+                    <button 
+                      className="upload-prompt-btn"
+                      onClick={handleBackToUpload}
+                    >
+                      Go to Upload Page
+                    </button>
+                  </div>
+                )
               )}
             </div>
           </main>
