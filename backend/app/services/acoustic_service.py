@@ -2,6 +2,10 @@
 Acoustic Service for Signal Processing
 Provides service layer for acoustic signal processing
 """
+import io
+import base64
+from scipy.io import wavfile
+import numpy as np
 
 import numpy as np
 from ..models.acoustic_model import (
@@ -22,6 +26,34 @@ class AcousticService:
         self.vehicle_analyzer = VehicleSoundAnalyzer()
         self.drone_detector = DroneDetector()
     
+
+
+    def generate_doppler_sound_base64(self, velocity, frequency, duration=5.0, sample_rate=44100):
+        """
+        Generate Doppler sound and return base64 WAV for browser playback.
+        """
+        # Step 1: Get raw audio from your existing function
+        raw = generate_vehicle_passing_sound(velocity, frequency, duration, sample_rate)
+        audio_array = np.array(raw["audio"], dtype=np.float32)  # make sure it's float32
+
+        # Step 2: Scale to int16 for WAV
+        audio_int16 = np.int16(audio_array / np.max(np.abs(audio_array)) * 32767)
+
+        # Step 3: Write WAV to memory
+        buffer = io.BytesIO()
+        wavfile.write(buffer, sample_rate, audio_int16)
+        buffer.seek(0)
+
+        # Step 4: Encode as base64
+        audio_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+        # Step 5: Return JSON
+        return {
+            "audio_base64": audio_base64,
+            "sample_rate": sample_rate,
+            "duration": duration
+        }
+
     def generate_doppler_sound(self, velocity: float, frequency: float, 
                                duration: float = 5.0, 
                                sample_rate: int = 44100) -> dict:
