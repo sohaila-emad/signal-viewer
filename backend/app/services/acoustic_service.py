@@ -6,8 +6,9 @@ import io
 import base64
 from scipy.io import wavfile
 import numpy as np
+from scipy import signal
 
-import numpy as np
+
 from ..models.acoustic_model import (
     generate_vehicle_passing_sound,
     analyze_vehicle_sound,
@@ -106,7 +107,12 @@ class AcousticService:
         max_val = np.max(np.abs(audio_array))
         if max_val > 1.0:
             audio_array = audio_array / max_val
+
         
+        # Pre-filter to isolate vehicle frequency range (80Hz - 4kHz)
+        sos = signal.butter(4, [80, 4000], btype='band', fs=sample_rate, output='sos')
+        audio_array = signal.sosfilt(sos, audio_array)
+                
         return analyze_vehicle_sound(audio_array.tolist(), sample_rate)
     
     def detect_unmanned_vehicle(self, audio_data: list, 
@@ -185,8 +191,7 @@ class AcousticService:
         Returns:
             Spectrogram data
         """
-        from scipy import signal
-        
+       
         audio_array = np.array(audio_data, dtype=np.float64)
         
         # Compute spectrogram

@@ -10,7 +10,7 @@ const AcousticPage = () => {
   const [frequency, setFrequency] = useState(440);
   const [dopplerParams, setDopplerParams] = useState(null);
   const [generatedAudio, setGeneratedAudio] = useState(null);
-
+  const [audioFile, setAudioFile] = useState(null);
   // Vehicle analysis state
   const [vehicleResult, setVehicleResult] = useState(null);
   const [analyzingVehicle, setAnalyzingVehicle] = useState(false);
@@ -59,21 +59,15 @@ const AcousticPage = () => {
   const handleAnalyzeVehicle = async () => {
     setAnalyzingVehicle(true);
     try {
-      // Generate sample audio for analysis
-      const response = await acousticAPI.generateDoppler({
-        velocity: velocity,
-        frequency: frequency,
-        duration: 3.0,
-        sample_rate: 44100
-      });
 
-      if (response.data.audio_data) {
-        const analysis = await acousticAPI.analyzeVehicle(
-          response.data.audio_data,
-          44100
-        );
-        setVehicleResult(analysis.data);
-      }
+      const arrayBuffer = await audioFile.arrayBuffer();
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const audioData = Array.from(audioBuffer.getChannelData(0));
+      const analysis = await acousticAPI.analyzeVehicle(audioData, 44100);
+      setVehicleResult(analysis.data);
+
+
     } catch (error) {
       console.error('Error analyzing vehicle:', error);
     } finally {
@@ -84,30 +78,23 @@ const AcousticPage = () => {
   const handleDetectDrone = async () => {
     setDetecting(true);
     try {
-      // Generate sample audio for detection
-      const response = await acousticAPI.generateDoppler({
-        velocity: velocity,
-        frequency: frequency,
-        duration: 3.0,
-        sample_rate: 44100
-      });
+      const arrayBuffer = await audioFile.arrayBuffer();
+      const audioData = Array.from(new Float32Array(arrayBuffer));
+      const detection = await acousticAPI.detectVehicle(
+        audioData,
+        44100,
+        'auto'
+      );
+      setDetectionResult(detection.data);
 
-      if (response.data.audio_data) {
-        const detection = await acousticAPI.detectVehicle(
-          response.data.audio_data,
-          44100,
-          'auto'
-        );
-        setDetectionResult(detection.data);
+      // Also compute spectrogram
+      const spectrogram = await acousticAPI.computeSpectrogram(
+        audioData,
+        44100,
+        256
+      );
+      setSpectrogramData(spectrogram.data);
 
-        // Also compute spectrogram
-        const spectrogram = await acousticAPI.computeSpectrogram(
-          response.data.audio_data,
-          44100,
-          256
-        );
-        setSpectrogramData(spectrogram.data);
-      }
     } catch (error) {
       console.error('Error detecting drone:', error);
     } finally {
@@ -258,53 +245,16 @@ const AcousticPage = () => {
             borderRadius: '8px',
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
-            <h3>📊 Doppler Parameters</h3>
+
 
             {dopplerParams ? (
               <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Source Frequency:</td>
-                      <td style={{ padding: '10px' }}>{dopplerParams.source_frequency} Hz</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Vehicle Velocity:</td>
-                      <td style={{ padding: '10px' }}>{dopplerParams.vehicle_velocity} m/s</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Approaching Frequency:</td>
-                      <td style={{ padding: '10px', color: '#4ecdc4', fontWeight: 'bold' }}>
-                        {dopplerParams.approaching_frequency} Hz
-                      </td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Receding Frequency:</td>
-                      <td style={{ padding: '10px', color: '#ff6b6b', fontWeight: 'bold' }}>
-                        {dopplerParams.receding_frequency} Hz
-                      </td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Doppler Shift (Approaching):</td>
-                      <td style={{ padding: '10px' }}>+{dopplerParams.doppler_shift_approaching} Hz</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Doppler Shift (Receding):</td>
-                      <td style={{ padding: '10px' }}>-{dopplerParams.doppler_shift_receding} Hz</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Speed of Sound:</td>
-                      <td style={{ padding: '10px' }}>{dopplerParams.speed_of_sound} m/s</td>
-                    </tr>
-                  </tbody>
-                </table>
 
                 {generatedAudio && (
                   <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '4px' }}>
                     <h4>✅ Audio Generated!</h4>
                     <p>Duration: {generatedAudio.duration?.toFixed(2)} seconds</p>
                     <p>Sample Rate: {generatedAudio.sample_rate} Hz</p>
-                    <p>Samples: {generatedAudio.audio_data?.length || 0}</p>
                   </div>
                 )}
               </div>
@@ -313,14 +263,7 @@ const AcousticPage = () => {
             )}
 
             {/* Formula explanation */}
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#fff3e0', borderRadius: '4px' }}>
-              <h4 style={{ margin: '0 0 10px 0' }}>📐 Doppler Effect Formula</h4>
-              <p style={{ fontSize: '0.9rem', margin: 0 }}>
-                f' = f × (v_sound ± v_observer) / (v_sound ± v_source)<br /><br />
-                When approaching: frequency increases<br />
-                When receding: frequency decreases
-              </p>
-            </div>
+
           </div>
         </div>
       )}
@@ -341,35 +284,23 @@ const AcousticPage = () => {
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Vehicle Velocity: {velocity} m/s
+                Upload Audio File
               </label>
               <input
-                type="range"
-                min="1"
-                max="100"
-                value={velocity}
-                onChange={(e) => setVelocity(parseInt(e.target.value))}
-                style={{ width: '100%' }}
+                type="file"
+                accept="audio/*"
+                onChange={(e) => setAudioFile(e.target.files[0])}
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Source Frequency: {frequency} Hz
-              </label>
-              <input
-                type="range"
-                min="100"
-                max="2000"
-                value={frequency}
-                onChange={(e) => setFrequency(parseInt(e.target.value))}
-                style={{ width: '100%' }}
-              />
+              {!audioFile && (
+                <p style={{ color: '#e74c3c', fontSize: '0.85rem', marginTop: '5px' }}>
+                  No file selected. Please upload an audio file to analyze.
+                </p>
+              )}
             </div>
 
             <button
               onClick={handleAnalyzeVehicle}
-              disabled={analyzingVehicle}
+              disabled={analyzingVehicle || !audioFile}
               style={{
                 padding: '12px 24px',
                 backgroundColor: analyzingVehicle ? '#ccc' : '#45b7d1',
@@ -399,17 +330,12 @@ const AcousticPage = () => {
                   <strong>Estimated Velocity:</strong> {vehicleResult.estimated_velocity?.toFixed(2)} m/s
                 </div>
                 <div style={{ marginBottom: '15px' }}>
-                  <strong>Estimated Frequency:</strong> {vehicleResult.estimated_frequency?.toFixed(2)} Hz
+                  <strong>Estimated Frequency:</strong> {vehicleResult.estimated_horn_frequency?.toFixed(2)} Hz
                 </div>
                 <div style={{ marginBottom: '15px' }}>
                   <strong>Confidence:</strong> {((vehicleResult.confidence || 0) * 100).toFixed(1)}%
                 </div>
-
-                {vehicleResult.doppler_shift && (
-                  <div style={{ padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-                    <strong>Doppler Shift:</strong> {vehicleResult.doppler_shift.toFixed(2)} Hz
-                  </div>
-                )}
+        
               </div>
             ) : (
               <p style={{ color: '#666' }}>
@@ -436,35 +362,23 @@ const AcousticPage = () => {
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Vehicle Velocity: {velocity} m/s
+                Upload Audio File
               </label>
               <input
-                type="range"
-                min="1"
-                max="100"
-                value={velocity}
-                onChange={(e) => setVelocity(parseInt(e.target.value))}
-                style={{ width: '100%' }}
+                type="file"
+                accept="audio/*"
+                onChange={(e) => setAudioFile(e.target.files[0])}
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Source Frequency: {frequency} Hz
-              </label>
-              <input
-                type="range"
-                min="100"
-                max="2000"
-                value={frequency}
-                onChange={(e) => setFrequency(parseInt(e.target.value))}
-                style={{ width: '100%' }}
-              />
+              {!audioFile && (
+                <p style={{ color: '#e74c3c', fontSize: '0.85rem', marginTop: '5px' }}>
+                  No file selected. Please upload an audio file to analyze.
+                </p>
+              )}
             </div>
 
             <button
               onClick={handleDetectDrone}
-              disabled={detecting}
+              disabled={detecting || !audioFile}
               style={{
                 padding: '12px 24px',
                 backgroundColor: detecting ? '#ccc' : '#96ceb4',

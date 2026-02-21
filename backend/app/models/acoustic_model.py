@@ -59,44 +59,30 @@ class DopplerEffectModel:
         """
         t = np.linspace(0, duration, int(sample_rate * duration))
         
-        # Calculate frequency over time as vehicle approaches then passes
-        # Vehicle starts at distance d approaching, passes at t=duration/2
+    
         n_samples = len(t)
-        mid_point = n_samples // 2
         
-        frequencies = np.zeros(n_samples)
-        
-        for i in range(n_samples):
-            if i < mid_point:
-                # Approaching - frequency increases
-                progress = i / mid_point
-                # Start from lower frequency, approach max
-                f_start = self.get_receding_frequency() * 0.8
-                frequencies[i] = f_start + progress * (self.source_frequency - f_start)
-            else:
-                # Receding - frequency decreases
-                progress = (i - mid_point) / (n_samples - mid_point)
-                frequencies[i] = self.source_frequency * (self.SPEED_OF_SOUND / 
-                                                          (self.SPEED_OF_SOUND + 
-                                                           self.vehicle_velocity * progress))
-        
-        # Generate audio signal using the varying frequencies
-        # Use sine wave with frequency modulation
-        audio = np.zeros(n_samples)
-        phase = 0
-        for i in range(n_samples):
-            phase += 2 * np.pi * frequencies[i] / sample_rate
-            audio[i] = np.sin(phase)
-        
-        # Apply envelope to simulate vehicle approaching and receding
-        envelope = np.zeros(n_samples)
-        for i in range(n_samples):
-            if i < mid_point:
-                envelope[i] = (i / mid_point) * 0.8  # Ramp up
-            else:
-                envelope[i] = ((n_samples - i) / (n_samples - mid_point)) * 0.8
-        
-        audio = audio * envelope
+        # Geometry-based Doppler using actual distance and radial velocity
+        h = 2.0  # closest distance to observer in meters
+        t_axis = np.linspace(-duration/2, duration/2, n_samples)
+        dist = np.sqrt((self.vehicle_velocity * t_axis)**2 + h**2)
+        v_radial = (self.vehicle_velocity**2 * t_axis) / dist
+        frequencies = self.source_frequency * (self.SPEED_OF_SOUND / (self.SPEED_OF_SOUND + v_radial))
+
+        # Sawtooth wave for realistic horn character
+        phase = 2 * np.pi * np.cumsum(frequencies) / sample_rate
+        audio = 0.5 * (2 * (phase / (2 * np.pi) % 1) - 1)
+
+        # Brown noise for engine rumble
+        engine_noise = np.cumsum(np.random.uniform(-1, 1, n_samples))
+        engine_noise /= np.max(np.abs(engine_noise))
+
+        # Inverse square law amplitude envelope
+        amplitude = h / dist
+        audio = (audio + engine_noise * 0.3) * amplitude
+
+        # Normalize
+        audio = audio / np.max(np.abs(audio))
         
         return t, frequencies, audio
     
@@ -159,8 +145,10 @@ class VehicleSoundAnalyzer:
         positive_frequencies = frequencies[positive_freq_idx]
         magnitude = np.abs(fft_result[positive_freq_idx])
         
-        # Find peaks in the spectrum
-        peaks, properties = signal.find_peaks(magnitude, height=np.max(magnitude)*0.1)
+        # Ignore frequencies below 80Hz (noise) and above 4kHz (not vehicle)
+        valid = (positive_frequencies >= 80) & (positive_frequencies <= 4000)
+        magnitude[~valid] = 0
+        peaks, properties = signal.find_peaks(magnitude, height=np.max(magnitude)*0.15, distance=50)
         
         peak_frequencies = positive_frequencies[peaks]
         peak_magnitudes = magnitude[peaks]
@@ -182,49 +170,56 @@ class VehicleSoundAnalyzer:
     def estimate_vehicle_parameters(self, audio_data: np.ndarray, 
                                    sample_rate: int = 44100) -> dict:
         """
-        Estimate vehicle velocity and horn frequency from audio.
-        
-        Uses spectral analysis to find the fundamental frequency and
-        estimate the Doppler shift to calculate velocity.
-        
+        Estimate velocity using FFT on approaching/receding halves.
+
         Args:
             audio_data: Audio signal array
             sample_rate: Sampling rate in Hz
-            
+
         Returns:
             Dictionary with estimated parameters
         """
-        analysis = self.analyze_audio(audio_data, sample_rate)
-        
-        if not analysis['dominant_frequencies']:
-            return {
-                'estimated_velocity': None,
-                'estimated_horn_frequency': None,
-                'confidence': 0
-            }
-        
-        # Assume the dominant frequency is the horn frequency
-        # For a more accurate estimate, we'd need to track frequency change over time
-        estimated_horn_freq = analysis['dominant_frequencies'][0]
-        
-        # Simple velocity estimation based on frequency spread
-        # This is a simplified model - real implementation would track frequency over time
-        freq_spread = max(analysis['dominant_frequencies']) - min(analysis['dominant_frequencies'])
-        
-        # Estimate velocity based on expected Doppler shift
-        # This is a rough estimate
-        doppler_model = DopplerEffectModel(estimated_horn_freq, 30)  # Assume 30 m/s max
-        max_doppler_shift = doppler_model.get_approaching_frequency() - estimated_horn_freq
-        
-        estimated_velocity = (freq_spread / max_doppler_shift) * 30 if max_doppler_shift > 0 else 0
-        
-        return {
-            'estimated_velocity': round(estimated_velocity, 2),
-            'estimated_horn_frequency': round(estimated_horn_freq, 2),
-            'confidence': 0.7 if freq_spread > 10 else 0.3,
-            'analysis': analysis
-        }
+        # Find crossover point — moment vehicle is closest = loudest
+        energy = np.convolve(audio_data**2, np.ones(1000)/1000, mode='same')
+        crossover_idx = np.argmax(energy)
 
+        # Need enough samples on each side for reliable FFT
+        if crossover_idx < sample_rate * 0.5 or crossover_idx > len(audio_data) - sample_rate * 0.5:
+            return {'estimated_velocity': None, 'estimated_horn_frequency': None, 'confidence': 0}
+
+        before = audio_data[:crossover_idx]
+        after  = audio_data[crossover_idx:]
+
+        def dominant_frequency(segment):
+            """Get dominant frequency in vehicle range using FFT."""
+            windowed = segment * np.hanning(len(segment))
+            spectrum = np.abs(fft(windowed))
+            freqs    = fftfreq(len(segment), 1/sample_rate)
+            # Only look at 80Hz-4kHz range
+            valid = (freqs >= 80) & (freqs <= 4000)
+            spectrum[~valid] = 0
+            return float(freqs[np.argmax(spectrum)])
+
+        f_approaching = dominant_frequency(before)
+        f_receding    = dominant_frequency(after)
+
+        if f_approaching <= f_receding:
+            return {'estimated_velocity': None, 'estimated_horn_frequency': None, 'confidence': 0}
+
+        # Doppler formula: v = c * (f_before - f_after) / (f_before + f_after)
+        estimated_velocity = DopplerEffectModel.SPEED_OF_SOUND * (f_approaching - f_receding) / (f_approaching + f_receding)
+        estimated_horn_freq  = (f_approaching + f_receding) / 2
+        freq_spread          = f_approaching - f_receding
+
+        # Confidence: larger spread relative to source = stronger Doppler signal
+        confidence = round(min((freq_spread / estimated_horn_freq) * 5, 1.0), 3)
+
+        return {
+            'estimated_velocity':      round(estimated_velocity, 2),
+            'estimated_horn_frequency': round(estimated_horn_freq, 2),
+            'confidence':              confidence,
+            'doppler_shift':           round(freq_spread, 2)
+        }
 
 class DroneDetector:
     """
