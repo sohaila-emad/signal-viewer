@@ -15,6 +15,7 @@ const StockPage = () => {
   const [comparisonData, setComparisonData] = useState(null);
   const [compareSymbols, setCompareSymbols] = useState([]);
   const [predictionMethod, setPredictionMethod] = useState('lr');
+  const [predictionDays, setPredictionDays] = useState(7);
   const [error, setError] = useState(null);
 
   // Expanded options from backend

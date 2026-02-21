@@ -1,0 +1,290 @@
+{
+  "id": "test-microbiome-dataset",
+  "format": "Biological Observation Matrix 1.0.0",
+  "format_url": "http://biom-format.org",
+  "type": "OTU table",
+  "generated_by": "signal-viewer microbiome generator",
+  "date": "2024-01-01T00:00:00.000000",
+  "rows": [
+    {
+      "id": "Bacteroides",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Bacteroidetes;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Bacteroides"
+      }
+    },
+    {
+      "id": "Prevotella",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Bacteroidetes;c__Bacteroidia;o__Bacteroidales;f__Prevotellaceae;g__Prevotella"
+      }
+    },
+    {
+      "id": "Faecalibacterium",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Clostridia;o__Clostridiales;f__Ruminococcaceae;g__Faecalibacterium"
+      }
+    },
+    {
+      "id": "Bifidobacterium",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Actinobacteria;c__Actinobacteria;o__Bifidobacteriales;f__Bifidobacteriaceae;g__Bifidobacterium"
+      }
+    },
+    {
+      "id": "Lactobacillus",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales;f__Lactobacillaceae;g__Lactobacillus"
+      }
+    },
+    {
+      "id": "Escherichia",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia"
+      }
+    },
+    {
+      "id": "Streptococcus",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales;f__Streptococcaceae;g__Streptococcus"
+      }
+    },
+    {
+      "id": "Clostridium",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Clostridia;o__Clostridiales;f__Clostridiaceae;g__Clostridium"
+      }
+    },
+    {
+      "id": "Ruminococcus",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Clostridia;o__Clostridiales;f__Ruminococcaceae;g__Ruminococcus"
+      }
+    },
+    {
+      "id": "Akkermansia",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Verrucomicrobia;c__Verrucomicrobiae;o__Verrucomicrobiales;f__Akkermansiaceae;g__Akkermansia"
+      }
+    },
+    {
+      "id": "Blautia",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Clostridia;o__Clostridiales;f__Lachnospiraceae;g__Blautia"
+      }
+    },
+    {
+      "id": "Roseburia",
+      "metadata": {
+        "taxonomy": "d__Bacteria;p__Firmicutes;c__Clostridia;o__Clostridiales;f__Lachnospiraceae;g__Roseburia"
+      }
+    }
+  ],
+  "columns": [
+    {
+      "id": "SAMPLE_0000",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0001",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0002",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0003",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0004",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0005",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0006",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0007",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0008",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0009",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0010",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0011",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0012",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0013",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0014",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0015",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0016",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0017",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0018",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0019",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0020",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0021",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0022",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0023",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0024",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0025",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0026",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0027",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0028",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0029",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0030",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0031",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0032",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0033",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0034",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0035",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0036",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0037",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0038",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0039",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0040",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0041",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0042",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0043",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0044",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0045",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0046",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0047",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0048",
+      "metadata": {}
+    },
+    {
+      "id": "SAMPLE_0049",
+      "metadata": {}
+    }
+  ],
+  "matrix_type": "sparse",
+  "matrix_element_type": "int",
+  "data": [
+    [
+      0,
+      0,
+      

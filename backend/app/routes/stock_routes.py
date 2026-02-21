@@ -152,8 +152,8 @@ def predict_stock(symbol):
     if method not in ['sma', 'exp', 'lr', 'lstm']:
         return jsonify({'error': 'Invalid method. Choose from: sma, exp, lr, lstm'}), 400
     
-    if n_days < 1 or n_days > 30:
-        return jsonify({'error': 'n_days must be between 1 and 30'}), 400
+    if n_days < 1 or n_days > 90:
+        return jsonify({'error': 'n_days must be between 1 and 90 (up to 3 months)'}), 400
     
     try:
         result = stock_service.predict_stock_price(symbol.upper(), method, n_days)

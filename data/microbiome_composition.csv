@@ -1,0 +1,13 @@
+genus,mean_abundance,phylum
+Escherichia,0.12483745196296667,Bacteroidetes
+Bacteroides,0.11350628428814473,Bacteroidetes
+Clostridium,0.09738500312731768,Firmicutes
+Ruminococcus,0.09567804931545226,Actinobacteria
+Prevotella,0.08854831592467194,Firmicutes
+Streptococcus,0.08514359997223059,Proteobacteria
+Blautia,0.07946092236498778,Firmicutes
+Akkermansia,0.07249120209432308,Firmicutes
+Roseburia,0.0659182520721943,Firmicutes
+Bifidobacterium,0.06461645835115853,Verrucomicrobia
+Lactobacillus,0.06294660648503408,Firmicutes
+Faecalibacterium,0.049467854041518364,Firmicutes

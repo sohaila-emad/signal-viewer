@@ -5,7 +5,7 @@ Provides service layer for microbiome data analysis
 
 import pandas as pd
 from typing import Dict, List, Optional
-from backend.app.models.microbiome_model import (
+from app.models.microbiome_model import (
     MicrobiomeDataLoader,
     MicrobiomeAnalyzer,
     load_microbiome_data,

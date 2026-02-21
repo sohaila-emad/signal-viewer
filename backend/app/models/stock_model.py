@@ -415,7 +415,7 @@ class LSTMPredictor:
         scaled = (data - min_val) / (max_val - min_val)
         return scaled, min_val, max_val
     
-    def _build_model(self, lookback: int = 60) -> Sequential:
+    def _build_model(self, lookback: int = 60):
         """Build LSTM model architecture."""
         if not TF_AVAILABLE:
             return None

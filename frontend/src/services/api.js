@@ -101,6 +101,20 @@ export const microbiomeAPI = {
   // Analysis
   analyzeDiversity: (samples) => 
     api.post('/microbiome/analyze-diversity', { samples }),
+    
+  // NEW ENDPOINTS
+  getSummary: () => api.get('/microbiome/summary'),
+  getDiseases: () => api.get('/microbiome/diseases'),
+  getTaxa: () => api.get('/microbiome/taxa'),
+  analyze: (data) => api.post('/microbiome/analyze', data),
+  estimatePatient: (data) => api.post('/microbiome/estimate-patient', data),
+  getStatistics: () => api.get('/microbiome/statistics'),
+  getDiversity: () => api.get('/microbiome/diversity'),
+  compareSamples: (sample1Id, sample2Id) => 
+    api.post('/microbiome/compare', { sample1_id: sample1Id, sample2_id: sample2Id }),
+  getComposition: () => api.get('/microbiome/composition'),
+  getDiseaseSamples: (diseaseName) => api.get(`/microbiome/disease/${diseaseName}`),
+  loadData: (nSamples) => api.post('/microbiome/load-data', { n_samples: nSamples }),
 };
 
 export default api;
