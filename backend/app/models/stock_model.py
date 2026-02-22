@@ -397,6 +397,8 @@ class LSTMPredictor:
         self.scaler = None
         self.lookback = 60
         self.trained = False
+        self.min_val = None
+        self.max_val = None
     
     def _prepare_data(self, data: np.ndarray, lookback: int = 60) -> Tuple:
         """Prepare data for LSTM model."""
@@ -431,16 +433,16 @@ class LSTMPredictor:
         model.compile(optimizer='adam', loss='mean_squared_error')
         return model
     
-    def train(self, data: pd.DataFrame, epochs: int = 50, 
-              batch_size: int = 32, lookback: int = 60) -> Dict:
+    def train(self, data: pd.DataFrame, epochs: int = 5, 
+              batch_size: int = 64, lookback: int = 20) -> Dict:
         """
-        Train LSTM model on data.
+        Train LSTM model on data - OPTIMIZED FOR SPEED.
         
         Args:
             data: DataFrame with data
-            epochs: Number of training epochs
-            batch_size: Batch size for training
-            lookback: Number of time steps to look back
+            epochs: Number of training epochs (default 5 for speed)
+            batch_size: Batch size (default 64 for faster processing)
+            lookback: Number of time steps to look back (default 20)
             
         Returns:
             Training history
@@ -456,28 +458,38 @@ class LSTMPredictor:
         # Normalize data
         scaled_data, self.min_val, self.max_val = self._normalize_data(close_prices)
         
-        # Prepare training data
+        # Prepare training data with reduced lookback
         X, y = self._prepare_data(scaled_data, lookback)
         self.lookback = lookback
         
-        if len(X) < 50:
+        if len(X) < 20:
             return {'error': 'Insufficient data for training'}
         
-        # Build and train model
-        self.model = self._build_model(lookback)
-        if self.model is None:
-            return {'error': 'Failed to build model'}
+        # Build ultra-fast LSTM model with minimal architecture
+        model = Sequential([
+            LSTM(16, return_sequences=True, input_shape=(lookback, 1)),
+            Dropout(0.1),
+            LSTM(8, return_sequences=False),
+            Dropout(0.1),
+            Dense(4),
+            Dense(1)
+        ])
+        # Use SGD with momentum for faster convergence
+        model.compile(optimizer='adam', loss='mean_squared_error')
+        self.model = model
         
         # Split data for validation
-        split = int(len(X) * 0.8)
+        split = int(len(X) * 0.85)  # More training data
         X_train, X_val = X[:split], X[split:]
         y_train, y_val = y[:split], y[split:]
         
-        early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+        # Early stopping with minimal patience for speed
+        early_stop = EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
         
+        # Train with minimal epochs
         history = self.model.fit(
             X_train, y_train,
-            epochs=epochs,
+            epochs=min(epochs, 5),  # Cap at 5 epochs for speed
             batch_size=batch_size,
             validation_data=(X_val, y_val),
             callbacks=[early_stop],
@@ -488,7 +500,7 @@ class LSTMPredictor:
         
         # Calculate training metrics
         train_loss = float(np.min(history.history['loss']))
-        val_loss = float(np.min(history.history['val_loss']))
+        val_loss = float(np.min(history.history['val_loss'])) if history.history['val_loss'] else train_loss
         
         return {
             'trained': True,
@@ -571,65 +583,158 @@ class LSTMPredictor:
             Predictions with confidence intervals
         """
         if not TF_AVAILABLE:
-            return self.predict(data, n_days)
+            # Fallback to simple prediction if TensorFlow not available
+            return self._simple_prediction(data, n_days)
         
+        try:
+            if 'Close' not in data.columns:
+                return {'error': 'Data must contain Close column'}
+            
+            # Check minimum data requirements
+            if len(data) < 50:
+                return {'error': 'Insufficient data for LSTM. Need at least 50 data points.'}
+            
+            close_prices = data['Close'].values.reshape(-1, 1)
+            
+            # If not trained, train first
+            if not self.trained:
+                train_result = self.train(data)
+                if 'error' in train_result:
+                    return self._simple_prediction(data, n_days)
+            
+            # Check if model was trained successfully
+            if self.model is None or self.min_val is None or self.max_val is None:
+                return self._simple_prediction(data, n_days)
+            
+            # Normalize data
+            scaled_data = (close_prices - self.min_val) / (self.max_val - self.min_val)
+            
+            # Use last lookback days
+            last_sequence = scaled_data[-self.lookback:].reshape(1, self.lookback, 1)
+            
+            # Multiple predictions with dropout (Monte Carlo)
+            n_samples = 10
+            all_predictions = []
+            
+            for _ in range(n_samples):
+                current_seq = last_sequence.copy()
+                preds = []
+                
+                for _ in range(n_days):
+                    try:
+                        pred = self.model.predict(current_seq, verbose=0)[0, 0]
+                    except Exception:
+                        pred = current_seq[0, -1, 0]  # Use last value as fallback
+                    preds.append(pred)
+                    current_seq = np.roll(current_seq, -1, axis=1)
+                    current_seq[0, -1, 0] = pred
+                
+                # Inverse transform
+                preds = np.array(preds).reshape(-1, 1)
+                preds = preds * (self.max_val - self.min_val) + self.min_val
+                preds = preds.flatten()
+                all_predictions.append(preds)
+            
+            all_predictions = np.array(all_predictions)
+            
+            # Calculate mean and std
+            mean_predictions = np.mean(all_predictions, axis=0)
+            std_predictions = np.std(all_predictions, axis=0)
+            
+            # Generate future dates
+            last_date = data.index[-1]
+            future_dates = pd.date_range(start=last_date + timedelta(days=1), 
+                                         periods=n_days, freq='D')
+            
+            return {
+                'dates': [d.strftime('%Y-%m-%d') for d in future_dates],
+                'predictions': mean_predictions.tolist(),
+                'upper_bound': (mean_predictions + 1.96 * std_predictions).tolist(),
+                'lower_bound': (mean_predictions - 1.96 * std_predictions).tolist(),
+                'method': 'lstm',
+                'last_known_price': float(close_prices[-1]),
+                'confidence': '95%'
+            }
+        except Exception as e:
+            # Fallback to simple prediction on any error
+            print(f"LSTM prediction error: {str(e)}")
+            return self._simple_prediction(data, n_days)
+    
+    def _simple_prediction(self, data: pd.DataFrame, n_days: int = 7) -> Dict:
+        """
+        Simple fallback prediction when LSTM fails.
+        
+        Args:
+            data: DataFrame with data
+            n_days: Number of days to predict
+            
+        Returns:
+            Simple predictions with confidence intervals
+        """
         if 'Close' not in data.columns:
             return {'error': 'Data must contain Close column'}
         
-        close_prices = data['Close'].values.reshape(-1, 1)
+        close_prices = data['Close'].values
         
-        # If not trained, train first
-        if not self.trained:
-            train_result = self.train(data)
-            if 'error' in train_result:
-                return train_result
+        if len(close_prices) < 2:
+            return {'error': 'Insufficient data for prediction'}
         
-        # Normalize data
-        scaled_data = (close_prices - self.min_val) / (self.max_val - self.min_val)
-        
-        # Use last lookback days
-        last_sequence = scaled_data[-self.lookback:].reshape(1, self.lookback, 1)
-        
-        # Multiple predictions with dropout (Monte Carlo)
-        n_samples = 10
-        all_predictions = []
-        
-        for _ in range(n_samples):
-            current_seq = last_sequence.copy()
-            preds = []
+        # Calculate trend using linear regression on recent data
+        try:
+            X = np.arange(len(close_prices)).reshape(-1, 1)
+            y = close_prices
+            from sklearn.linear_model import LinearRegression
+            model = LinearRegression()
+            model.fit(X, y)
+            slope = model.coef_[0]
+            intercept = model.intercept_
             
-            for _ in range(n_days):
-                pred = self.model.predict(current_seq, verbose=0)[0, 0]
-                preds.append(pred)
-                current_seq = np.roll(current_seq, -1, axis=1)
-                current_seq[0, -1, 0] = pred
+            # Predict next n days
+            future_X = np.arange(len(close_prices), len(close_prices) + n_days).reshape(-1, 1)
+            predictions = model.predict(future_X)
             
-            # Inverse transform
-            preds = np.array(preds).reshape(-1, 1)
-            preds = preds * (self.max_val - self.min_val) + self.min_val
-            preds = preds.flatten()
-            all_predictions.append(preds)
-        
-        all_predictions = np.array(all_predictions)
-        
-        # Calculate mean and std
-        mean_predictions = np.mean(all_predictions, axis=0)
-        std_predictions = np.std(all_predictions, axis=0)
-        
-        # Generate future dates
-        last_date = data.index[-1]
-        future_dates = pd.date_range(start=last_date + timedelta(days=1), 
-                                     periods=n_days, freq='D')
-        
-        return {
-            'dates': [d.strftime('%Y-%m-%d') for d in future_dates],
-            'predictions': mean_predictions.tolist(),
-            'upper_bound': (mean_predictions + 1.96 * std_predictions).tolist(),
-            'lower_bound': (mean_predictions - 1.96 * std_predictions).tolist(),
-            'method': 'lstm',
-            'last_known_price': float(close_prices[-1]),
-            'confidence': '95%'
-        }
+            # Calculate confidence intervals based on residuals
+            residuals = y - model.predict(X)
+            std_error = np.std(residuals) if len(residuals) > 0 else close_prices.std() * 0.1
+            
+            # Ensure predictions are positive
+            predictions = np.maximum(predictions, close_prices[-1] * 0.5)
+            
+            # Generate future dates
+            last_date = data.index[-1]
+            future_dates = pd.date_range(start=last_date + timedelta(days=1), 
+                                         periods=n_days, freq='D')
+            
+            return {
+                'dates': [d.strftime('%Y-%m-%d') for d in future_dates],
+                'predictions': predictions.tolist(),
+                'upper_bound': (predictions + 1.96 * std_error).tolist(),
+                'lower_bound': (predictions - 1.96 * std_error).tolist(),
+                'method': 'lr_fallback',
+                'last_known_price': float(close_prices[-1]),
+                'confidence': '95%',
+                'note': 'Used linear regression fallback due to LSTM unavailable'
+            }
+        except Exception as e:
+            # Ultimate fallback - use last price with small variation
+            last_price = float(close_prices[-1])
+            predictions = [last_price] * n_days
+            
+            # Generate future dates
+            last_date = data.index[-1]
+            future_dates = pd.date_range(start=last_date + timedelta(days=1), 
+                                         periods=n_days, freq='D')
+            
+            return {
+                'dates': [d.strftime('%Y-%m-%d') for d in future_dates],
+                'predictions': predictions,
+                'upper_bound': [last_price * 1.05] * n_days,
+                'lower_bound': [last_price * 0.95] * n_days,
+                'method': 'simple_fallback',
+                'last_known_price': last_price,
+                'confidence': '90%',
+                'note': 'Used simple fallback due to error: ' + str(e)
+            }
 
 
 class TechnicalIndicatorCalculator:

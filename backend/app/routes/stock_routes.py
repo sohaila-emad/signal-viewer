@@ -143,20 +143,35 @@ def predict_stock(symbol):
     Predict stock prices.
     
     Query parameters:
-    - method: Prediction method ('sma', 'exp', 'lr')
+    - method: Prediction method ('sma', 'exp', 'lr', 'lstm')
     - n_days: Number of days to predict (default: 7)
+    - period: Prediction period ('7d', '1mo', '3mo', '6mo', '1y')
+               - '7d': 7 days prediction
+               - '1mo': 1 month prediction (~30 days)
+               - '3mo': 3 months prediction (~90 days)
+               - '6mo': 6 months prediction (~180 days)
     """
     method = request.args.get('method', 'sma')
     n_days = request.args.get('n_days', type=int, default=7)
+    period = request.args.get('period', '1y')
     
     if method not in ['sma', 'exp', 'lr', 'lstm']:
         return jsonify({'error': 'Invalid method. Choose from: sma, exp, lr, lstm'}), 400
     
-    if n_days < 1 or n_days > 90:
-        return jsonify({'error': 'n_days must be between 1 and 90 (up to 3 months)'}), 400
+    # Map period to n_days
+    period_to_days = {'7d': 7, '1mo': 30, '3mo': 90, '6mo': 180, '1y': 365}
+    if period in period_to_days and n_days == 7:
+        n_days = period_to_days[period]
+    
+    if n_days < 1 or n_days > 365:
+        return jsonify({'error': 'n_days must be between 1 and 365'}), 400
+    
+    valid_periods = ['7d', '1mo', '3mo', '6mo', '1y', '2y']
+    if period not in valid_periods:
+        return jsonify({'error': f'Invalid period. Choose from: {valid_periods}'}), 400
     
     try:
-        result = stock_service.predict_stock_price(symbol.upper(), method, n_days)
+        result = stock_service.predict_stock_price(symbol.upper(), method, n_days, period)
         if 'error' in result:
             return jsonify(result), 404
         return jsonify(result)

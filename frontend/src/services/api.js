@@ -4,7 +4,7 @@ const API_BASE_URL = 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 120000, // Increased to 2 minutes for LSTM training
   headers: {
     'Content-Type': 'application/json',
   }
@@ -77,9 +77,9 @@ export const stockAPI = {
   getMineralData: (symbol, period = '1y', interval = '1d') => 
     api.get(`/stock/mineral/data/${symbol}`, { params: { period, interval } }),
   
-  // Prediction
-  predictStock: (symbol, method = 'sma', nDays = 7) => 
-    api.get(`/stock/predict/${symbol}`, { params: { method, n_days: nDays } }),
+  // Prediction - Updated to support period parameter for 6mo, 1mo, 7d predictions
+  predictStock: (symbol, method = 'sma', nDays = 7, period = '1y') => 
+    api.get(`/stock/predict/${symbol}`, { params: { method, n_days: nDays, period } }),
   
   // Technical analysis
   getTechnicalAnalysis: (symbol) => api.get(`/stock/analysis/${symbol}`),

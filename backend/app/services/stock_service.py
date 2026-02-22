@@ -90,7 +90,7 @@ class StockService:
         return StockDataFetcher.DEFAULT_MINERALS.get(category, [])
     
     def predict_stock_price(self, symbol: str, method: str = 'sma',
-                          n_days: int = 7) -> Dict:
+                          n_days: int = 7, period: str = '1y') -> Dict:
         """
         Predict stock prices.
         
@@ -98,12 +98,25 @@ class StockService:
             symbol: Stock ticker
             method: Prediction method ('sma', 'exp', 'lr', 'lstm')
             n_days: Number of days to predict
+            period: Historical data period for training (1mo, 3mo, 6mo, 1y, 2y)
             
         Returns:
             Dictionary with predictions
         """
         try:
-            df = self.fetcher.fetch_data(symbol)
+            # Map period to days for fetching historical data
+            period_map = {
+                '7d': '1mo',
+                '1mo': '3mo', 
+                '3mo': '6mo',
+                '6mo': '1y',
+                '1y': '2y',
+                '2y': '5y'
+            }
+            # Use longer period for LSTM to get more training data
+            fetch_period = period_map.get(period, '1y')
+            
+            df = self.fetcher.fetch_data(symbol, period=fetch_period)
             
             if df is None or df.empty:
                 return {'error': f'No data found for symbol: {symbol}'}
@@ -111,14 +124,20 @@ class StockService:
             if method == 'lstm':
                 # Use LSTM predictor
                 predictions = self.lstm_predictor.predict_with_confidence(df, n_days)
+                # Add period info to response
+                predictions['prediction_period'] = period
+                predictions['n_days'] = n_days
                 return predictions
             else:
                 # Use simple predictor
-                return self.predictor.predict_next_days(
+                result = self.predictor.predict_next_days(
                     df, 
                     method=method, 
                     n_days=n_days
                 )
+                result['prediction_period'] = period
+                result['n_days'] = n_days
+                return result
         except Exception as e:
             return {'error': str(e)}
     

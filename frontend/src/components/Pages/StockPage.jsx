@@ -14,8 +14,9 @@ const StockPage = () => {
   const [technicalAnalysis, setTechnicalAnalysis] = useState(null);
   const [comparisonData, setComparisonData] = useState(null);
   const [compareSymbols, setCompareSymbols] = useState([]);
-  const [predictionMethod, setPredictionMethod] = useState('lr');
+  const [predictionMethod, setPredictionMethod] = useState('lstm');
   const [predictionDays, setPredictionDays] = useState(7);
+  const [predictionPeriod, setPredictionPeriod] = useState('1mo');
   const [error, setError] = useState(null);
 
   // Expanded options from backend
@@ -58,6 +59,13 @@ const StockPage = () => {
     { value: 'lr', label: 'Linear Regression' },
     { value: 'sma', label: 'Simple Moving Avg' },
     { value: 'lstm', label: 'LSTM AI (with confidence)' }
+  ];
+
+  // Prediction periods for LSTM: 7 days, 1 month, 6 months
+  const predictionPeriods = [
+    { value: '7d', label: '7 Days' },
+    { value: '1mo', label: '1 Month' },
+    { value: '6mo', label: '6 Months' }
   ];
 
   useEffect(() => {
@@ -144,7 +152,9 @@ const StockPage = () => {
     if (!stockData) return;
     try {
       setLoading(true);
-      const response = await stockAPI.predictStock(symbol, predictionMethod, 7);
+      // Convert prediction period to n_days for API
+      const nDays = predictionPeriod === '6mo' ? 180 : predictionPeriod === '1mo' ? 30 : 7;
+      const response = await stockAPI.predictStock(symbol, predictionMethod, nDays, predictionPeriod);
       setPrediction(response.data);
     } catch (err) {
       console.error('Error predicting:', err);
@@ -455,8 +465,14 @@ const StockPage = () => {
                       {predictionMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '0.9rem' }}>Prediction Period:</label>
+                    <select value={predictionPeriod} onChange={(e) => setPredictionPeriod(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minWidth: '150px' }}>
+                      {predictionPeriods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </div>
                   <button onClick={handlePredict} disabled={!stockData || loading} style={{ padding: '10px 25px', backgroundColor: !stockData || loading ? '#ccc' : '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: !stockData || loading ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
-                    {loading ? '⏳ Predicting...' : '🔮 Predict 7 Days'}
+                    {loading ? '⏳ Predicting...' : `🔮 Predict ${predictionPeriods.find(p => p.value === predictionPeriod)?.label || '7 Days'}`}
                   </button>
                 </div>
               </div>
