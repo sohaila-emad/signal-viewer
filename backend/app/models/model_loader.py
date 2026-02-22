@@ -14,6 +14,9 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
+# Confidence threshold: correct diagnoses had >80%; below this we return "unknown"
+CONFIDENCE_THRESHOLD = 0.8
+
 # Try to import wfdb for reading WFDB files
 try:
     import wfdb
@@ -275,6 +278,9 @@ class ECGNetLoader:
             confidence = float(probs_np[pred_idx])
             
             prediction = self.abnormality_classes.get(pred_idx, 'unknown')
+            below_threshold = confidence < CONFIDENCE_THRESHOLD
+            if below_threshold:
+                prediction = 'unknown'
             
             # All probabilities
             all_probs = {
@@ -285,6 +291,7 @@ class ECGNetLoader:
             return {
                 'prediction': prediction,
                 'confidence': round(confidence, 4),
+                'below_threshold': below_threshold,
                 'all_probabilities': {k: round(v, 4) for k, v in all_probs.items()},
                 'model_type': 'deep_learning',
                 'model_path': self.model_path,
@@ -444,9 +451,14 @@ class ClassicalMLLoader:
                     **{k: 0.0 for k, v in self.ABNORMALITY_CLASSES.items() if v != prediction}
                 }
             
+            below_threshold = confidence < CONFIDENCE_THRESHOLD
+            if below_threshold:
+                prediction = 'unknown'
+            
             return {
                 'prediction': prediction,
                 'confidence': round(confidence, 4),
+                'below_threshold': below_threshold,
                 'all_probabilities': {k: round(v, 4) for k, v in all_probs.items()},
                 'model_type': 'classical_ml',
                 'features_used': 48,  # Mean, Std, Max, Min × 12 leads
