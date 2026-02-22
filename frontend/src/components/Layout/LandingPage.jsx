@@ -55,9 +55,13 @@ const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType 
 
   // Handle file input
   const handleFileInput = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      console.log('File selected:', e.target.files[0].name);
-      onFileSelected(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      console.log(`Files selected: ${files.map(f => f.name).join(', ')}`);
+      // Send all files at once
+      for (let file of files) {
+        onFileSelected(file);
+      }
     }
   };
 
@@ -121,7 +125,8 @@ const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType 
             type="file"
             id="file-input"
             onChange={handleFileInput}
-            accept=".csv,.txt,.wav,.mp3,.edf,.hea,.xlsx,.json"
+            multiple
+            accept=".csv,.txt,.wav,.mp3,.edf,.hea,.dat,.xlsx,.json"
             style={{ display: 'none' }}
           />
           

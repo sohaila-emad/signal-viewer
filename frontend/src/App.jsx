@@ -23,17 +23,14 @@ function App() {
   const handleDataLoaded = (data) => {
     console.log('✅ Data loaded successfully:', data);
     
-    // Add to upload history
-    const newEntry = {
+    // Add to upload history - store FULL data object
+    const historyEntry = {
       id: Date.now(),
-      filename: data.filename,
-      type: data.type,
-      channels: data.channels,
-      fs: data.fs,
-      time: new Date().toLocaleTimeString()
+      ...data,  // Store entire response from backend
+      _loadTime: new Date().toLocaleTimeString()  // Add load timestamp
     };
     
-    setUploadHistory(prev => [newEntry, ...prev].slice(0, 5)); // Keep last 5
+    setUploadHistory(prev => [historyEntry, ...prev].slice(0, 5)); // Keep last 5
     setSignalData(data);
     setShowLanding(false);
   };
@@ -183,7 +180,7 @@ function App() {
                                 <span>•</span>
                                 <span>{entry.fs} Hz</span>
                                 <span>•</span>
-                                <span>{entry.time}</span>
+                                <span>{entry._loadTime}</span>
                               </div>
                             </div>
                           </div>

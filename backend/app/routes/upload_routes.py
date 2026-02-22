@@ -7,11 +7,18 @@ import json
 import struct
 from werkzeug.utils import secure_filename
 
+# Try to import wfdb for reading WFDB format files
+try:
+    import wfdb
+    WFDB_AVAILABLE = True
+except ImportError:
+    WFDB_AVAILABLE = False
+
 upload_bp = Blueprint('upload', __name__)
 
 # Simplified extensions
 ALLOWED_EXTENSIONS = {
-    'medical': {'.edf', '.csv', '.mat'},
+    'medical': {'.edf', '.csv', '.mat', '.hea', '.dat'},
     'acoustic': {'.wav', '.mp3'},
     'stock': {'.csv', '.xlsx'},
     'microbiome': {'.biom', '.fasta', '.tsv'}
@@ -25,7 +32,7 @@ def safe_convert_to_list(data):
     return data
 
 def process_medical_file(filepath, filename):
-    """Process medical files: .edf, .csv, .mat"""
+    """Process medical files: .edf, .csv, .mat, .hea (WFDB), .dat (WFDB)"""
     ext = os.path.splitext(filename)[1].lower()
     
     try:
@@ -91,6 +98,58 @@ def process_medical_file(filepath, filename):
                     'type': 'medical',
                     'fs': fs
                 }
+        
+        # WFDB files (.hea or .dat)
+        elif ext in ['.hea', '.dat']:
+            if not WFDB_AVAILABLE:
+                return {'error': 'wfdb library not installed. Install with: pip install wfdb'}
+            
+            try:
+                # For WFDB files, we need both .hea and .dat files
+                # First, try to find the companion file in the same directory
+                base_path = filepath.replace('.hea', '').replace('.dat', '')
+                dir_path = os.path.dirname(filepath)
+                base_name = os.path.basename(base_path)
+                
+                # Check if both files exist in the temp directory
+                hea_file = os.path.join(dir_path, base_name + '.hea')
+                dat_file = os.path.join(dir_path, base_name + '.dat')
+                
+                # Try to read WFDB file from temp directory if both exist
+                files_missing = []
+                if not os.path.exists(hea_file):
+                    files_missing.append('.hea')
+                if not os.path.exists(dat_file):
+                    files_missing.append('.dat')
+                
+                if files_missing:
+                    # For browser uploads, user must upload both files together
+                    missing_str = ' and '.join(files_missing)
+                    return {
+                        'error': f'WFDB files require both .hea and .dat files. Missing: {missing_str}. '
+                                 f'Please upload both files (header and data files) together.'
+                    }
+                
+                # Read WFDB record
+                record = wfdb.rdrecord(base_path)
+                
+                # Extract signal data
+                signal_data = record.p_signal.T.tolist()  # Transpose to channel-first format
+                fs = record.fs
+                time = np.arange(record.p_signal.shape[0]) / fs
+                channel_names = record.sig_name
+                
+                return {
+                    'data': signal_data,
+                    'time': time.tolist(),
+                    'channels': len(signal_data),
+                    'channel_names': channel_names,
+                    'filename': filename,
+                    'type': 'medical',
+                    'fs': fs
+                }
+            except Exception as e:
+                return {'error': f'Error reading WFDB file: {str(e)}'}
         
         # MATLAB files
         elif ext == '.mat':
@@ -375,29 +434,41 @@ def process_microbiome_file(filepath, filename):
 
 @upload_bp.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload"""
+    """Handle file upload (single or multiple files for WFDB)"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
-        file = request.files['file']
         signal_type = request.form.get('type', 'medical')
         
-        if file.filename == '':
+        # Handle both single and multiple file uploads
+        files = request.files.getlist('file')
+        if not files or files[0].filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        # Check extension
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in ALLOWED_EXTENSIONS.get(signal_type, set()):
-            return jsonify({'error': f'Invalid file type. Expected: {ALLOWED_EXTENSIONS[signal_type]}'}), 400
-        
-        # Save temporarily
-        filename = secure_filename(file.filename)
+        # Create temp directory for all files
         temp_dir = tempfile.mkdtemp()
-        filepath = os.path.join(temp_dir, filename)
-        file.save(filepath)
+        saved_files = []
         
-        # Process based on type
+        # Save all files to the same temp directory
+        for file in files:
+            if file.filename == '':
+                continue
+            
+            # Check extension
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext not in ALLOWED_EXTENSIONS.get(signal_type, set()):
+                return jsonify({'error': f'Invalid file type. Expected: {ALLOWED_EXTENSIONS[signal_type]}'}), 400
+            
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(temp_dir, filename)
+            file.save(filepath)
+            saved_files.append((filepath, filename))
+        
+        if not saved_files:
+            return jsonify({'error': 'No valid files provided'}), 400
+        
+        # Process based on type (use first file as the primary file)
         processors = {
             'medical': process_medical_file,
             'acoustic': process_acoustic_file,
@@ -409,11 +480,21 @@ def upload_file():
         if not processor:
             return jsonify({'error': 'Invalid signal type'}), 400
         
-        result = processor(filepath, filename)
+        # Process the primary file (first file or .hea file for WFDB)
+        primary_file = saved_files[0]
+        
+        # For WFDB, prefer processing the .hea file
+        if signal_type == 'medical':
+            hea_file = next((f for f in saved_files if f[1].endswith('.hea')), None)
+            if hea_file:
+                primary_file = hea_file
+        
+        result = processor(primary_file[0], primary_file[1])
         
         # Clean up
         try:
-            os.remove(filepath)
+            for filepath, _ in saved_files:
+                os.remove(filepath)
             os.rmdir(temp_dir)
         except:
             pass

@@ -36,6 +36,7 @@ export const medicalAPI = {
   getSignals: () => api.get('/medical/signals'),
   getSignal: (id) => api.get(`/medical/signal/${id}`),
   predict: (id) => api.get(`/medical/predict/${id}`),
+  predictFromData: (signalData) => api.post('/medical/predict', signalData),
 };
 
 export const acousticAPI = {

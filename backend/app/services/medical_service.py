@@ -6,22 +6,50 @@ Provides service layer for medical signal processing (ECG/EEG)
 import numpy as np
 from typing import Dict, List, Optional
 from ..models.ecg_model import (
-    ECGClassifier,
-    ClassicMLAnalyzer,
     predict_ecg,
-    analyze_ecg_classic,
-    get_available_abnormalities,
-    ECGFeatureExtractor
+    analyze_ecg_classic
+)
+from ..models.model_loader import (
+    initialize_models,
+    get_ecgnet_model,
+    get_classical_ml_model
 )
 
 
 class MedicalService:
     """Service for medical signal processing operations."""
     
+    # Define supported abnormalities
+    ABNORMALITY_TYPES = [
+        'normal',
+        'atrial_fibrillation',
+        'ventricular_tachycardia',
+        'premature_ventricular_contraction',
+        'bradycardia'
+    ]
+    
     def __init__(self):
-        self.ecg_classifier = ECGClassifier()
-        self.classic_analyzer = ClassicMLAnalyzer()
-        self.feature_extractor = ECGFeatureExtractor()
+        # Initialize real trained models
+        print("\n" + "="*60)
+        print("Initializing ECG Analysis Service")
+        print("="*60)
+        self.model_status = initialize_models()
+        
+        # Check which models are available
+        self.ecgnet_model = get_ecgnet_model()
+        self.classical_ml_model = get_classical_ml_model()
+        
+        self.use_real_models = self.model_status['ecgnet'] or self.model_status['classical_ml']
+        
+        if self.use_real_models:
+            print("\n✓ REAL trained models are ACTIVE")
+            print(f"  - ECGNet (Deep Learning): {'LOADED' if self.model_status['ecgnet'] else 'Not available'}")
+            print(f"  - Classical ML (Random Forest): {'LOADED' if self.model_status['classical_ml'] else 'Not available'}")
+            print(f"  - Device: {self.model_status['device']}")
+        else:
+            print("\n⚠ No real models found, using SYNTHETIC predictions")
+            print(f"  - Models directory: {self.model_status['models_dir']}")
+        print("="*60 + "\n")
     
     def get_signals(self) -> List[Dict]:
         """Get list of available medical signals."""
@@ -187,22 +215,25 @@ class MedicalService:
         
         return signal
     
-    def predict_abnormality(self, signal_data: Dict) -> Dict:
+    def predict_abnormality(self, signal_data: Dict, temperature: float = 2.0) -> Dict:
         """
         Predict abnormality from ECG signal data.
         
+        Uses real trained models (Deep Learning + Classical ML) with fallback to synthetic predictions.
+        
         Args:
             signal_data: Dictionary with ECG data
+            temperature: Temperature scaling for ECGNet (>1 = softer predictions for better calibration)
             
         Returns:
-            Prediction results
+            Prediction results with deep learning and classical ML comparisons
         """
-        # Convert data to numpy array
+        # Convert data to numpy array (handle as multi-channel 12 leads)
         data = signal_data.get('data', [])
         if isinstance(data, list):
-            # If multi-channel, use first channel for prediction
-            if isinstance(data[0], list):
-                ecg_data = np.array(data[0])
+            if len(data) > 0 and isinstance(data[0], list):
+                # Multi-channel format: convert to (12, N)
+                ecg_data = np.array(data)
             else:
                 ecg_data = np.array(data)
         else:
@@ -210,20 +241,89 @@ class MedicalService:
         
         fs = signal_data.get('fs', 250)
         
-        # Get AI prediction
-        ai_prediction = predict_ecg(ecg_data, fs)
+        results = {}
         
-        # Get classic ML analysis
-        classic_analysis = analyze_ecg_classic(ecg_data, fs)
+        # === REAL MODEL PREDICTIONS ===
+        if self.use_real_models:
+            results['using_real_models'] = True
+            
+            # ECGNet Deep Learning Model with temperature scaling for better calibration
+            if self.ecgnet_model is not None:
+                results['ecgnet'] = self.ecgnet_model.predict(ecg_data, temperature=temperature)
+            else:
+                results['ecgnet'] = {'prediction': None, 'confidence': 0, 'error': 'Model not loaded'}
+            
+            # Classical ML Model (Random Forest)
+            if self.classical_ml_model is not None:
+                results['classical_ml'] = self.classical_ml_model.predict(ecg_data)
+            else:
+                results['classical_ml'] = {'prediction': None, 'confidence': 0, 'error': 'Model not loaded'}
+            
+            # Comparison between models
+            results['comparison'] = self._compare_models(results['ecgnet'], results['classical_ml'])
+            
+        else:
+            results['using_real_models'] = False
+            print("⚠ Using SYNTHETIC predictions (real models not available)")
+            
+            # Fallback to synthetic predictions
+            synthetic_ai = predict_ecg(ecg_data, fs)
+            synthetic_classic = analyze_ecg_classic(ecg_data, fs)
+            
+            results['synthetic_ai'] = synthetic_ai
+            results['synthetic_analysis'] = synthetic_classic
+        
+        return results
+    
+    def _compare_models(self, ecgnet_result: Dict, classical_result: Dict) -> Dict:
+        """
+        Compare predictions from ECGNet and Classical ML models.
+        
+        Args:
+            ecgnet_result: ECGNet prediction result
+            classical_result: Classical ML prediction result
+            
+        Returns:
+            Comparison dictionary
+        """
+        ecgnet_pred = ecgnet_result.get('prediction', 'unknown')
+        ecgnet_conf = ecgnet_result.get('confidence', 0)
+        
+        classical_pred = classical_result.get('prediction', 'unknown')
+        classical_conf = classical_result.get('confidence', 0)
+        
+        # Agreement check
+        agreement = ecgnet_pred == classical_pred
+        
+        # Ensemble prediction: prefer agreement, otherwise choose higher confidence
+        if agreement:
+            ensemble_pred = ecgnet_pred
+            ensemble_conf = (ecgnet_conf + classical_conf) / 2
+            confidence_source = 'Both models agree'
+        else:
+            if ecgnet_conf > classical_conf:
+                ensemble_pred = ecgnet_pred
+                ensemble_conf = ecgnet_conf
+                confidence_source = f'ECGNet ({ecgnet_conf:.2%}) > Classical ({classical_conf:.2%})'
+            else:
+                ensemble_pred = classical_pred
+                ensemble_conf = classical_conf
+                confidence_source = f'Classical ({classical_conf:.2%}) > ECGNet ({ecgnet_conf:.2%})'
         
         return {
-            'ai_prediction': ai_prediction,
-            'classic_analysis': classic_analysis,
-            'comparison': self._compare_ai_classic(ai_prediction, classic_analysis)
+            'ecgnet_prediction': ecgnet_pred,
+            'ecgnet_confidence': ecgnet_conf,
+            'classical_prediction': classical_pred,
+            'classical_confidence': classical_conf,
+            'ensemble_prediction': ensemble_pred,
+            'ensemble_confidence': ensemble_conf,
+            'agreement': agreement,
+            'confidence_source': confidence_source,
+            'summary': f"Ensemble prediction: {ensemble_pred} ({ensemble_conf:.2%} confidence)"
         }
     
     def _compare_ai_classic(self, ai_prediction: Dict, classic_analysis: Dict) -> Dict:
-        """Compare AI and classic ML predictions."""
+        """Compare AI and classic ML predictions (legacy method - kept for reference)."""
         # Map AI prediction to classic analysis
         ai_type = ai_prediction.get('prediction', 'unknown')
         
@@ -254,7 +354,55 @@ class MedicalService:
     
     def get_abnormalities(self) -> List[str]:
         """Get list of detectable abnormalities."""
-        return get_available_abnormalities()
+        return self.ABNORMALITY_TYPES
+    
+    def predict_from_wfdb(self, wfdb_path: str, temperature: float = 2.0) -> Dict:
+        """
+        Predict ECG abnormality from WFDB file (direct format without CSV conversion).
+        
+        This allows testing if the problem is in the CSV conversion or model itself.
+        
+        Args:
+            wfdb_path: Path to WFDB file (without extension, e.g., './data/record')
+            temperature: Temperature scaling for ECGNet confidence calibration
+            
+        Returns:
+            Dictionary with predictions from both models
+        """
+        from ..models.model_loader import read_wfdb_file
+        
+        try:
+            # Read WFDB file directly
+            signal_data, fs, channel_names = read_wfdb_file(wfdb_path)
+            
+            results = {
+                'source': 'wfdb_file',
+                'wfdb_path': wfdb_path,
+                'channels': len(channel_names),
+                'channel_names': channel_names,
+                'fs': fs,
+                'samples': signal_data.shape[1],
+                'data_range': [float(signal_data.min()), float(signal_data.max())]
+            }
+            
+            # Get predictions from both models
+            if self.ecgnet_model is not None:
+                results['ecgnet'] = self.ecgnet_model.predict(signal_data, temperature=temperature)
+            else:
+                results['ecgnet'] = {'prediction': None, 'confidence': 0, 'error': 'Model not loaded'}
+            
+            if self.classical_ml_model is not None:
+                results['classical_ml'] = self.classical_ml_model.predict(signal_data)
+            else:
+                results['classical_ml'] = {'prediction': None, 'confidence': 0, 'error': 'Model not loaded'}
+            
+            # Model comparison
+            results['comparison'] = self._compare_models(results.get('ecgnet', {}), results.get('classical_ml', {}))
+            
+            return results
+            
+        except Exception as e:
+            return {'error': str(e), 'type': 'wfdb_read_error'}
 
 
 # Singleton instance
