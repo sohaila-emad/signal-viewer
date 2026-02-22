@@ -67,20 +67,21 @@ class ECGNet(nn.Module):
 class ECGNetLoader:
     """Loader for ECGNet deep learning model"""
     
-    # Class mappings for different model versions
+    # PTB-XL 4-class mapping (Models.md §5): label_int → label
     ABNORMALITY_CLASSES_4 = {
-        0: 'normal',
-        1: 'atrial_fibrillation',
-        2: 'ventricular_tachycardia',
-        3: 'premature_ventricular_contraction'
+        0: 'MI',    # Myocardial infarction
+        1: 'STTC',  # ST/T change (ST–T changes)
+        2: 'CD',    # Conduction disturbance
+        3: 'HYP',   # Hypertrophy
     }
     
+    # Fallback for 5-class checkpoints (if any)
     ABNORMALITY_CLASSES_5 = {
-        0: 'normal',
-        1: 'atrial_fibrillation',
-        2: 'ventricular_tachycardia',
-        3: 'premature_ventricular_contraction',
-        4: 'bradycardia'
+        0: 'MI',
+        1: 'STTC',
+        2: 'CD',
+        3: 'HYP',
+        4: 'unknown',
     }
     
     def __init__(self, model_path: str = None, device: str = None):
@@ -94,8 +95,8 @@ class ECGNetLoader:
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.model_path = model_path
-        self.num_classes = 5  # Will be updated on load
-        self.abnormality_classes = self.ABNORMALITY_CLASSES_5
+        self.num_classes = 4  # Trained model (final_ecgnet_model.pth) has 4 classes
+        self.abnormality_classes = self.ABNORMALITY_CLASSES_4
         
         if model_path and os.path.exists(model_path):
             self.load_model(model_path)
@@ -115,7 +116,7 @@ class ECGNetLoader:
             checkpoint = torch.load(model_path, map_location=self.device)
             
             # Inspect checkpoint to determine output classes
-            num_classes = 5  # Default
+            num_classes = 4  # Default (PTB-XL 4-class: MI, STTC, CD, HYP)
             if isinstance(checkpoint, dict):
                 # Try to infer from state dict
                 if 'fc2.weight' in checkpoint or 'fc2.weight' in checkpoint.get('model_state_dict', {}):
@@ -189,12 +190,12 @@ class ECGNetLoader:
         n_samples = ecg_data.shape[1]
         target_samples = target_shape[1]
         
-        # Resample if needed
+        # Resample if needed (model expects exactly 1000 samples per lead)
         if n_samples != target_samples:
             ecg_data = self._resample_signal(ecg_data, target_samples)
         
-        # Normalize
-        ecg_data = self._normalize(ecg_data)
+        # No normalization: training used raw signal (see Models.md).
+        # Applying min-max or z-score at inference would mismatch training and hurt accuracy.
         
         # Add batch dimension: (12, 1000) -> (1, 12, 1000)
         tensor = torch.from_numpy(ecg_data).float().unsqueeze(0)
@@ -219,8 +220,9 @@ class ECGNetLoader:
     
     def _normalize(self, signal: np.ndarray) -> np.ndarray:
         """
-        Normalize signal per channel.
-        Uses min-max normalization instead of z-score to preserve signal structure.
+        Normalize signal per channel (min-max to [-1, 1]).
+        NOT used at inference: training used raw signal (Models.md); using this would hurt accuracy.
+        Kept only for optional experimentation.
         """
         normalized = signal.copy()
         
@@ -298,15 +300,14 @@ class ECGNetLoader:
 
 
 class ClassicalMLLoader:
-    """Loader for Classical ML model (Random Forest)"""
+    """Loader for Classical ML model (Random Forest). Trained with 4 classes (Models.md)."""
     
-    # Class mapping
+    # PTB-XL 4-class mapping (Models.md §5): label_int → label
     ABNORMALITY_CLASSES = {
-        0: 'normal',
-        1: 'atrial_fibrillation',
-        2: 'ventricular_tachycardia',
-        3: 'premature_ventricular_contraction',
-        4: 'bradycardia'
+        0: 'MI',    # Myocardial infarction
+        1: 'STTC',  # ST/T change (ST–T changes)
+        2: 'CD',    # Conduction disturbance
+        3: 'HYP',   # Hypertrophy
     }
     
     def __init__(self, model_path: str = None):
@@ -347,11 +348,16 @@ class ClassicalMLLoader:
             self.model = None
             return False
     
+    # Target length for feature extraction (must match training: train_classical.py uses 1000-sample signals)
+    TARGET_SAMPLES = 1000
+
     def extract_features(self, ecg_data: np.ndarray) -> np.ndarray:
         """
         Extract statistical features from ECG data.
         
-        Features: Mean, Std, Max, Min for each of 12 leads = 48 features
+        Features: Mean, Std, Max, Min for each of 12 leads = 48 features.
+        Order: 12 means, 12 stds, 12 maxs, 12 mins (same as train_classical.py).
+        Uses exactly 1000 samples (resampled/cropped) to match training.
         
         Args:
             ecg_data: ECG signal array (12 leads, N samples)
@@ -372,22 +378,29 @@ class ClassicalMLLoader:
                 if ecg_data.shape[1] == 12:
                     ecg_data = ecg_data.T
         
-        # Extract features per lead
-        features = []
+        n_leads, n_samples = ecg_data.shape
+        # Use exactly TARGET_SAMPLES (1000) so statistics match training distribution
+        if n_samples != self.TARGET_SAMPLES:
+            ecg_data = self._resample_to_target(ecg_data, self.TARGET_SAMPLES)
         
-        # Add mean for each lead
-        features.extend(np.mean(ecg_data, axis=1))
-        
-        # Add std for each lead
-        features.extend(np.std(ecg_data, axis=1))
-        
-        # Add max for each lead
-        features.extend(np.max(ecg_data, axis=1))
-        
-        # Add min for each lead
-        features.extend(np.min(ecg_data, axis=1))
-        
-        return np.array(features)
+        # Order: 12 means, then 12 stds, then 12 maxs, then 12 mins (match train_classical.py)
+        f_mean = np.mean(ecg_data, axis=1)
+        f_std = np.std(ecg_data, axis=1)
+        f_max = np.max(ecg_data, axis=1)
+        f_min = np.min(ecg_data, axis=1)
+        features = np.concatenate([f_mean, f_std, f_max, f_min])
+        return np.asarray(features, dtype=np.float64)
+    
+    def _resample_to_target(self, signal: np.ndarray, target_samples: int) -> np.ndarray:
+        """Resample (12, N) to (12, target_samples) via linear interpolation."""
+        n_channels, n_samples = signal.shape
+        if n_samples == target_samples:
+            return signal
+        indices = np.linspace(0, n_samples - 1, target_samples)
+        resampled = np.zeros((n_channels, target_samples))
+        for ch in range(n_channels):
+            resampled[ch] = np.interp(indices, np.arange(n_samples), signal[ch])
+        return resampled
     
     def predict(self, ecg_data: np.ndarray) -> Dict:
         """

@@ -19,14 +19,8 @@ from ..models.model_loader import (
 class MedicalService:
     """Service for medical signal processing operations."""
     
-    # Define supported abnormalities
-    ABNORMALITY_TYPES = [
-        'normal',
-        'atrial_fibrillation',
-        'ventricular_tachycardia',
-        'premature_ventricular_contraction',
-        'bradycardia'
-    ]
+    # PTB-XL 4 classes the models were trained on (Models.md §5)
+    ABNORMALITY_TYPES = ['MI', 'STTC', 'CD', 'HYP']
     
     def __init__(self):
         # Initialize real trained models
@@ -52,27 +46,18 @@ class MedicalService:
         print("="*60 + "\n")
     
     def get_signals(self) -> List[Dict]:
-        """Get list of available medical signals."""
+        """Get list of available medical signals (PTB-XL 4 classes)."""
         return [
-            {'id': 1, 'name': 'Normal ECG', 'type': 'normal', 'description': 'Normal heart rhythm'},
-            {'id': 2, 'name': 'Atrial Fibrillation', 'type': 'atrial_fibrillation', 'description': 'Irregular heart rhythm'},
-            {'id': 3, 'name': 'Ventricular Tachycardia', 'type': 'ventricular_tachycardia', 'description': 'Fast heart rate from ventricles'},
-            {'id': 4, 'name': 'Premature Ventricular Contraction', 'type': 'premature_ventricular_contraction', 'description': 'Extra heartbeats'},
-            {'id': 5, 'name': 'Bradycardia', 'type': 'bradycardia', 'description': 'Slow heart rate'}
+            {'id': 1, 'name': 'MI (Myocardial infarction)', 'type': 'MI', 'description': 'Myocardial infarction'},
+            {'id': 2, 'name': 'STTC (ST/T change)', 'type': 'STTC', 'description': 'ST–T changes'},
+            {'id': 3, 'name': 'CD (Conduction disturbance)', 'type': 'CD', 'description': 'Conduction disturbance'},
+            {'id': 4, 'name': 'HYP (Hypertrophy)', 'type': 'HYP', 'description': 'Hypertrophy'},
         ]
     
     def get_signal_data(self, signal_id: str) -> Dict:
-        """Get specific signal data."""
-        # Map signal IDs to abnormality types
-        abnormality_map = {
-            '1': 'normal',
-            '2': 'atrial_fibrillation',
-            '3': 'ventricular_tachycardia',
-            '4': 'premature_ventricular_contraction',
-            '5': 'bradycardia'
-        }
-        
-        abnormality = abnormality_map.get(signal_id, 'normal')
+        """Get specific signal data (synthetic demo per PTB-XL class)."""
+        abnormality_map = {'1': 'MI', '2': 'STTC', '3': 'CD', '4': 'HYP'}
+        abnormality = abnormality_map.get(signal_id, 'MI')
         
         # Generate synthetic ECG data for the given abnormality
         data = self._generate_ecg_data(abnormality)
@@ -111,108 +96,64 @@ class MedicalService:
     
     def _generate_ecg_signal(self, abnormality_type: str, t: np.ndarray, 
                            channel: int) -> np.ndarray:
-        """Generate ECG signal for a specific abnormality type."""
+        """Generate synthetic ECG for PTB-XL class (MI, STTC, CD, HYP) for demo."""
         np.random.seed(channel)
         
-        # Base frequency components
-        if abnormality_type == 'normal':
-            # Normal ECG: ~1 Hz base with harmonics
-            signal = (np.sin(2 * np.pi * 1.2 * t) + 
-                     0.5 * np.sin(2 * np.pi * 2.4 * t) +
-                     0.3 * np.sin(2 * np.pi * 3.6 * t))
-            
-            # Add PQRST complex pattern
-            for i, time in enumerate(t):
-                phase = time % 1.0
-                if 0.1 < phase < 0.2:  # P wave
-                    signal[i] += 0.3 * np.sin((phase - 0.1) * 10 * np.pi)
-                elif 0.35 < phase < 0.45:  # QRS complex
-                    signal[i] += 1.5 * np.sin((phase - 0.35) * 20 * np.pi)
-                elif 0.45 < phase < 0.55:  # R peak
-                    signal[i] += 0.5
-                elif 0.55 < phase < 0.65:  # S wave
-                    signal[i] -= 0.8 * np.sin((phase - 0.55) * 15 * np.pi)
-                elif 0.7 < phase < 0.9:  # T wave
-                    signal[i] += 0.4 * np.sin((phase - 0.7) * 5 * np.pi)
-        
-        elif abnormality_type == 'atrial_fibrillation':
-            # Irregular rhythm with no clear P waves
+        if abnormality_type == 'MI':
+            # Myocardial infarction: altered QRS/T morphology
             signal = np.zeros(len(t))
             for i, time in enumerate(t):
-                # Irregular R-R intervals
-                rr_interval = 0.7 + 0.3 * np.random.random()
-                phase = (time % rr_interval) / rr_interval
-                
+                phase = (time % 0.9) / 0.9
                 if 0.1 < phase < 0.2:
-                    signal[i] = 0.2 * np.random.random()
-                elif 0.3 < phase < 0.4:
-                    signal[i] = 1.2 + 0.3 * np.random.random()
-                elif 0.4 < phase < 0.45:
-                    signal[i] = 1.5 + 0.4 * np.random.random()
-                elif 0.45 < phase < 0.5:
-                    signal[i] = -0.6 + 0.2 * np.random.random()
-        
-        elif abnormality_type == 'ventricular_tachycardia':
-            # Fast, wide QRS complexes
+                    signal[i] = 0.2 * np.sin((phase - 0.1) * 10 * np.pi)
+                elif 0.3 < phase < 0.5:
+                    signal[i] = 1.2 * np.sin((phase - 0.3) * 15 * np.pi) - 0.3  # Deep Q / ST
+                elif 0.5 < phase < 0.65:
+                    signal[i] = -0.6 * np.sin((phase - 0.5) * 12 * np.pi)
+                elif 0.7 < phase < 0.88:
+                    signal[i] = 0.5 * np.sin((phase - 0.7) * 5 * np.pi)  # T
+        elif abnormality_type == 'STTC':
+            # ST/T change: elevated/depressed ST segment
             signal = np.zeros(len(t))
             for i, time in enumerate(t):
-                # Fast regular rhythm
-                phase = (time % 0.33) / 0.33  # ~180 bpm
-                
-                if 0.1 < phase < 0.4:
-                    signal[i] = 1.3 * np.sin(phase * np.pi)
-                elif 0.4 < phase < 0.5:
-                    signal[i] = -0.5
-        
-        elif abnormality_type == 'premature_ventricular_contraction':
-            # Normal rhythm with occasional premature beats
+                phase = (time % 0.85) / 0.85
+                if 0.35 < phase < 0.5:
+                    signal[i] = 1.0 * np.sin((phase - 0.35) * 20 * np.pi)
+                elif 0.5 < phase < 0.6:
+                    signal[i] = 0.4 + 0.2 * (phase - 0.5)  # ST elevation
+                elif 0.6 < phase < 0.8:
+                    signal[i] = 0.35 * np.sin((phase - 0.6) * 8 * np.pi)
+        elif abnormality_type == 'CD':
+            # Conduction disturbance: widened QRS
             signal = np.zeros(len(t))
             for i, time in enumerate(t):
-                # Regular rhythm with occasional early beats
-                beat_time = time % 0.85
-                
-                # Random premature beat
-                if np.random.random() < 0.05:
-                    beat_time = time % 0.4
-                
-                phase = beat_time / 0.85
-                
+                phase = (time % 0.95) / 0.95
+                if 0.08 < phase < 0.25:
+                    signal[i] = 0.25 * np.sin((phase - 0.08) * 8 * np.pi)
+                elif 0.25 < phase < 0.55:  # Wide QRS
+                    signal[i] = 1.1 * np.sin((phase - 0.25) * 6 * np.pi)
+                elif 0.55 < phase < 0.75:
+                    signal[i] = -0.5 * np.sin((phase - 0.55) * 10 * np.pi)
+                elif 0.75 < phase < 0.92:
+                    signal[i] = 0.3 * np.sin((phase - 0.75) * 5 * np.pi)
+        elif abnormality_type == 'HYP':
+            # Hypertrophy: large voltages, repolarization changes
+            signal = np.zeros(len(t))
+            for i, time in enumerate(t):
+                phase = (time % 0.88) / 0.88
                 if 0.1 < phase < 0.2:
-                    signal[i] = 0.3
-                elif 0.35 < phase < 0.5:
-                    signal[i] = 1.4 + 0.3 * np.random.random()
-                elif 0.5 < phase < 0.55:
-                    signal[i] = -0.7
-                elif 0.7 < phase < 0.9:
-                    signal[i] = 0.35
-        
-        elif abnormality_type == 'bradycardia':
-            # Slow heart rate
-            signal = np.zeros(len(t))
-            for i, time in enumerate(t):
-                phase = (time % 1.2) / 1.2  # ~50 bpm
-                
-                if 0.1 < phase < 0.2:
-                    signal[i] = 0.3 * np.sin((phase - 0.1) * 10 * np.pi)
-                elif 0.35 < phase < 0.45:
-                    signal[i] = 1.4 * np.sin((phase - 0.35) * 15 * np.pi)
-                elif 0.45 < phase < 0.55:
-                    signal[i] = 1.6
-                elif 0.55 < phase < 0.65:
-                    signal[i] = -0.7 * np.sin((phase - 0.55) * 10 * np.pi)
-                elif 0.7 < phase < 0.9:
-                    signal[i] = 0.35 * np.sin((phase - 0.7) * 5 * np.pi)
-        
+                    signal[i] = 0.4 * np.sin((phase - 0.1) * 10 * np.pi)
+                elif 0.32 < phase < 0.5:
+                    signal[i] = 1.6 * np.sin((phase - 0.32) * 18 * np.pi)  # Tall R
+                elif 0.5 < phase < 0.62:
+                    signal[i] = -0.9 * np.sin((phase - 0.5) * 14 * np.pi)
+                elif 0.68 < phase < 0.86:
+                    signal[i] = -0.3 + 0.5 * np.sin((phase - 0.68) * 5 * np.pi)  # T inversion
         else:
-            # Default normal
-            signal = np.sin(2 * np.pi * 1 * t)
+            signal = np.sin(2 * np.pi * 1.1 * t)
         
-        # Add some noise
         signal += 0.05 * np.random.randn(len(t))
-        
-        # Add channel-specific variation
-        signal += 0.1 * np.sin(2 * np.pi * 0.5 * t + channel)
-        
+        signal += 0.08 * np.sin(2 * np.pi * 0.5 * t + channel)
         return signal
     
     def predict_abnormality(self, signal_data: Dict, temperature: float = 2.0) -> Dict:
