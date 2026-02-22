@@ -103,6 +103,7 @@ class AcousticService:
         else:
             audio_array = audio_data
         
+        audio_array = np.nan_to_num(audio_array, nan=0.0, posinf=0.0, neginf=0.0)
         # Ensure audio is normalized
         max_val = np.max(np.abs(audio_array))
         if max_val > 1.0:
@@ -138,6 +139,9 @@ class AcousticService:
         else:
             audio_array = audio_data
         
+        # Remove NaN and Inf values before passing to librosa
+        audio_array = np.nan_to_num(audio_array, nan=0.0, posinf=0.0, neginf=0.0)
+
         # Normalize
         max_val = np.max(np.abs(audio_array))
         if max_val > 1.0:
@@ -145,12 +149,6 @@ class AcousticService:
         
         result = detect_drone_submarine(audio_array.tolist(), sample_rate)
         
-        # Filter by requested vehicle type if not auto
-        if vehicle_type != 'auto':
-            if vehicle_type == 'drone':
-                result['detection'] = 'drone' if result['drone_score'] > result['submarine_score'] else 'unknown'
-            elif vehicle_type == 'submarine':
-                result['detection'] = 'submarine' if result['submarine_score'] > result['drone_score'] else 'unknown'
         
         return result
     

@@ -8,6 +8,8 @@ Acoustic Models for Signal Processing
 import numpy as np
 from scipy import signal
 from scipy.fft import fft, fftfreq
+import tensorflow as tf
+import librosa
 
 
 class DopplerEffectModel:
@@ -222,118 +224,63 @@ class VehicleSoundAnalyzer:
         }
 
 class DroneDetector:
-    """
-    Detector for drone and submarine sounds using spectral analysis.
-    Uses characteristic frequency patterns to identify drone sounds.
-    """
-    
-    # Typical drone frequency ranges (Hz)
-    DRONE_FREQUENCY_RANGES = {
-        'propeller': (50, 500),
-        'motor': (500, 2000),
-        'electronics': (2000, 10000)
-    }
-    
-    # Typical submarine frequency ranges (Hz)
-    SUBMARINE_FREQUENCY_RANGES = {
-        'propeller': (10, 100),
-        'machinery': (100, 500),
-        'sonar_ping': (1000, 5000)
-    }
-    
+    """Drone detector using a trained TensorFlow mel-spectrogram classifier."""
+
+    SR        = 16000
+    DURATION  = 2
+    N_MELS    = 64
+    N_SAMPLES = 16000 * 2
+    THRESHOLD = 0.5
+
     def __init__(self):
-        self.sample_rate = 44100
-    
-    def compute_spectral_features(self, audio_data: np.ndarray, 
-                                  sample_rate: int = 44100) -> dict:
-        """
-        Compute spectral features for classification.
         
-        Args:
-            audio_data: Audio signal array
-            sample_rate: Sampling rate in Hz
-            
-        Returns:
-            Dictionary with spectral features
-        """
-        self.sample_rate = sample_rate
-        
-        # Compute spectrogram
-        f, t, Sxx = signal.spectrogram(audio_data, fs=sample_rate)
-        
-        # Compute spectral features
-        spectral_centroid = np.sum(f[:, np.newaxis] * Sxx, axis=0) / (np.sum(Sxx, axis=0) + 1e-10)
-        spectral_bandwidth = np.sqrt(np.sum(((f[:, np.newaxis] - spectral_centroid) ** 2) * Sxx, axis=0) / 
-                                      (np.sum(Sxx, axis=0) + 1e-10))
-        
-        # Compute power in different frequency bands
-        band_powers = {}
-        for band_name, (low, high) in self.DRONE_FREQUENCY_RANGES.items():
-            band_idx = (f >= low) & (f <= high)
-            band_powers[f'drone_{band_name}'] = np.mean(Sxx[band_idx, :]) if band_idx.any() else 0
-        
-        for band_name, (low, high) in self.SUBMARINE_FREQUENCY_RANGES.items():
-            band_idx = (f >= low) & (f <= high)
-            band_powers[f'submarine_{band_name}'] = np.mean(Sxx[band_idx, :]) if band_idx.any() else 0
-        
-        return {
-            'spectral_centroid': float(np.mean(spectral_centroid)),
-            'spectral_bandwidth': float(np.mean(spectral_bandwidth)),
-            'band_powers': band_powers,
-            'total_power': float(np.mean(Sxx))
-        }
-    
+        self.model = tf.keras.models.load_model("..\models\drone_detector.h5")
+
     def detect(self, audio_data: np.ndarray, sample_rate: int = 44100) -> dict:
         """
-        Detect if the audio contains drone or submarine sounds.
-        
+        Detect drone using mel-spectrogram fed into trained model.
+
         Args:
             audio_data: Audio signal array
-            sample_rate: Sampling rate in Hz
-            
+            sample_rate: Sample rate in Hz
+
         Returns:
             Detection results
         """
-        features = self.compute_spectral_features(audio_data, sample_rate)
-        
-        # Simple rule-based detection
-        # In a real system, this would use machine learning
-        band_powers = features['band_powers']
-        
-        drone_score = (band_powers.get('drone_propeller', 0) * 2 + 
-                     band_powers.get('drone_motor', 0) * 1.5 +
-                     band_powers.get('drone_electronics', 0))
-        
-        submarine_score = (band_powers.get('submarine_propeller', 0) * 2 +
-                         band_powers.get('submarine_machinery', 0) * 1.5 +
-                         band_powers.get('submarine_sonar_ping', 0))
-        
-        total_power = features['total_power'] + 1e-10
-        
-        # Normalize scores
-        drone_confidence = min(drone_score / total_power / 10, 1.0)
-        submarine_confidence = min(submarine_score / total_power / 10, 1.0)
-        
-        # Determine detection
-        detection_type = None
-        confidence = 0
-        
-        if drone_confidence > 0.3:
-            detection_type = 'drone'
-            confidence = drone_confidence
-        elif submarine_confidence > 0.3:
-            detection_type = 'submarine'
-            confidence = submarine_confidence
+       
+        print(f"1. Input received: type={type(audio_data)} sample_rate={sample_rate}")
+        audio_data = np.array(audio_data, dtype=np.float32)
+        print(f"2. Converted to array: shape={audio_data.shape} max={audio_data.max():.4f}")
+
+        if sample_rate != self.SR:
+            print(f"3. Resampling from {sample_rate} to {self.SR}...")
+            audio_data = librosa.resample(audio_data, orig_sr=sample_rate, target_sr=self.SR)
+            print(f"4. Resampled: shape={audio_data.shape} max={audio_data.max():.4f}")
+
+        if len(audio_data) < self.N_SAMPLES:
+            audio_data = np.pad(audio_data, (0, self.N_SAMPLES - len(audio_data)))
         else:
-            detection_type = 'unknown'
-            confidence = max(drone_confidence, submarine_confidence)
+            audio_data = audio_data[:self.N_SAMPLES]
+        print(f"5. After pad/trim: shape={audio_data.shape} max={audio_data.max():.4f}")
+
+        audio_data = audio_data.astype(np.float32)
+        mel    = librosa.feature.melspectrogram(y=audio_data, sr=self.SR, n_mels=self.N_MELS)
+        mel_db = librosa.power_to_db(mel, ref=np.max)
+        # Must match normalization applied during training
+        mel_db = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-8)
+        mel_db = mel_db[..., np.newaxis][np.newaxis, ...]
         
+        print(f"6. Mel shape: {mel_db.shape}")
+
+        prob      = float(self.model.predict(mel_db, verbose=0)[0][0])
+        detection = "drone" if prob >= self.THRESHOLD else "no_drone"
+        print(f"7. Prediction: prob={prob:.4f} detection={detection}")
+
         return {
-            'detection': detection_type,
-            'confidence': round(confidence, 3),
-            'drone_score': round(drone_confidence, 3),
-            'submarine_score': round(submarine_confidence, 3),
-            'features': features
+            'detection':       detection,
+            'drone_score':     round(prob, 3),
+            'submarine_score': 0.0,
+            'confidence':      round(prob if detection == "drone" else 1 - prob, 3),
         }
 
 
@@ -397,6 +344,7 @@ def detect_drone_submarine(audio_data: list, sample_rate: int = 44100) -> dict:
     Returns:
         Detection results
     """
-    audio_array = np.array(audio_data)
+    
+    audio_array = np.array(audio_data, dtype=np.float32)
     detector = DroneDetector()
     return detector.detect(audio_array, sample_rate)

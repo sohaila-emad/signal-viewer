@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { acousticAPI } from '../../services/api';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const AcousticPage = () => {
   const [activeMode, setActiveMode] = useState('doppler'); // 'doppler', 'vehicle', 'drone'
@@ -19,8 +18,6 @@ const AcousticPage = () => {
   const [detectionResult, setDetectionResult] = useState(null);
   const [detecting, setDetecting] = useState(false);
 
-  // Spectrogram state
-  const [spectrogramData, setSpectrogramData] = useState(null);
 
   useEffect(() => {
     // Get Doppler parameters when velocity or frequency changes
@@ -79,22 +76,14 @@ const AcousticPage = () => {
     setDetecting(true);
     try {
       const arrayBuffer = await audioFile.arrayBuffer();
-      const audioData = Array.from(new Float32Array(arrayBuffer));
-      const detection = await acousticAPI.detectVehicle(
-        audioData,
-        44100,
-        'auto'
-      );
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const sampleRate = audioBuffer.sampleRate;
+      const audioData = Array.from(audioBuffer.getChannelData(0));
+      const detection = await acousticAPI.detectVehicle(audioData, sampleRate, 'auto');
       setDetectionResult(detection.data);
 
-      // Also compute spectrogram
-      const spectrogram = await acousticAPI.computeSpectrogram(
-        audioData,
-        44100,
-        256
-      );
-      setSpectrogramData(spectrogram.data);
-
+    
     } catch (error) {
       console.error('Error detecting drone:', error);
     } finally {
@@ -434,26 +423,7 @@ const AcousticPage = () => {
                   </div>
                 )}
 
-                {detectionResult.submarine_score !== undefined && (
-                  <div style={{ marginBottom: '10px' }}>
-                    <strong>Submarine Score:</strong> {(detectionResult.submarine_score * 100).toFixed(1)}%
-                    <div style={{
-                      width: '100%',
-                      height: '20px',
-                      backgroundColor: '#eee',
-                      borderRadius: '10px',
-                      overflow: 'hidden',
-                      marginTop: '5px'
-                    }}>
-                      <div style={{
-                        width: `${detectionResult.submarine_score * 100}%`,
-                        height: '100%',
-                        backgroundColor: '#45b7d1',
-                        transition: 'width 0.3s'
-                      }} />
-                    </div>
-                  </div>
-                )}
+                
 
                 {detectionResult.confidence && (
                   <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
@@ -470,29 +440,7 @@ const AcousticPage = () => {
         </div>
       )}
 
-      {/* Spectrogram Display */}
-      {spectrogramData && activeMode === 'drone' && (
-        <div style={{
-          marginTop: '20px',
-          padding: '20px',
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <h3>📊 Spectrogram</h3>
-          <div style={{ height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={spectrogramData.frequencies?.map((f, i) => ({ frequency: f, value: spectrogramData.spectrogram?.[0]?.[i] || 0 }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="frequency" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke="#4ecdc4" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };
