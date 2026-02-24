@@ -8,13 +8,11 @@
 
 ### 🏠 Landing Page / Dashboard
 <img width="1734" height="957" alt="25 02 2026_00 07 12_REC" src="https://github.com/user-attachments/assets/98f628c1-12a6-476e-9790-097a978bb93a" />
-<img width="1734" height="957" alt="25 02 2026_00 07 12_REC" src="https://github.com/user-attachments/assets/98f628c1-12a6-476e-9790-097a978bb93a" />
 
 ---
 
 ### 🫀 Medical Signal Viewer — Multi-Channel ECG
 
-<img width="1797" height="870" alt="25 02 2026_00 15 47_REC" src="https://github.com/user-attachments/assets/467417a8-588e-4495-b4c8-da42476a9a27" />
 <img width="1797" height="870" alt="25 02 2026_00 15 47_REC" src="https://github.com/user-attachments/assets/467417a8-588e-4495-b4c8-da42476a9a27" />
 
 
@@ -22,20 +20,15 @@
 
 ### 🔁 XOR Graph Viewer
 <img width="1790" height="912" alt="25 02 2026_00 16 19_REC" src="https://github.com/user-attachments/assets/bf04b350-2056-4c84-89d6-16e689988d6e" />
-<img width="1790" height="912" alt="25 02 2026_00 16 19_REC" src="https://github.com/user-attachments/assets/bf04b350-2056-4c84-89d6-16e689988d6e" />
 
 ---
 
 ### 🧭 Polar Graph Viewer
 
 <img width="1300" height="892" alt="25 02 2026_00 16 59_REC" src="https://github.com/user-attachments/assets/bc9d5c0e-51ac-4a6e-9136-aea4ecfb11c6" />
-<img width="1300" height="892" alt="25 02 2026_00 16 59_REC" src="https://github.com/user-attachments/assets/bc9d5c0e-51ac-4a6e-9136-aea4ecfb11c6" />
-
----
 
 ### 🔵 Recurrence Graph Viewer
 
-<img width="1308" height="887" alt="25 02 2026_00 17 38_REC" src="https://github.com/user-attachments/assets/a36a8478-a175-42c6-8c74-0a23d50be01e" />
 <img width="1308" height="887" alt="25 02 2026_00 17 38_REC" src="https://github.com/user-attachments/assets/a36a8478-a175-42c6-8c74-0a23d50be01e" />
 
 
@@ -43,7 +36,6 @@
 
 ### 🔊 Acoustic Signals — Doppler Effect Synthesizer
 
-<img width="1811" height="881" alt="25 02 2026_00 18 41_REC" src="https://github.com/user-attachments/assets/15ca9668-fb73-4c48-becd-20f49b6f6ed6" />
 <img width="1811" height="881" alt="25 02 2026_00 18 41_REC" src="https://github.com/user-attachments/assets/15ca9668-fb73-4c48-becd-20f49b6f6ed6" />
 
 
@@ -58,32 +50,21 @@
 ### 📈 Stock Market, Currency & Minerals Dashboard
 
 <img width="1796" height="876" alt="25 02 2026_00 19 29_REC" src="https://github.com/user-attachments/assets/8c830462-92d0-4c8f-9511-c0c0cca4f231" />
-<img width="1796" height="876" alt="25 02 2026_00 19 29_REC" src="https://github.com/user-attachments/assets/8c830462-92d0-4c8f-9511-c0c0cca4f231" />
 
 <img width="1808" height="886" alt="25 02 2026_00 19 53_REC" src="https://github.com/user-attachments/assets/a9b6ee8e-ea6f-4b1b-b7d6-4aae54d60a9b" />
-<img width="1808" height="886" alt="25 02 2026_00 19 53_REC" src="https://github.com/user-attachments/assets/a9b6ee8e-ea6f-4b1b-b7d6-4aae54d60a9b" />
 <img width="1806" height="874" alt="25 02 2026_00 20 19_REC" src="https://github.com/user-attachments/assets/8e71257c-a24e-4620-b0f0-1e1685439537" />
-<img width="1806" height="874" alt="25 02 2026_00 20 19_REC" src="https://github.com/user-attachments/assets/8e71257c-a24e-4620-b0f0-1e1685439537" />
-
 
 ---
 
 ### 🧬 Microbiome Analysis Dashboard
 
 <img width="1818" height="894" alt="25 02 2026_00 22 43_REC" src="https://github.com/user-attachments/assets/d421cc93-3405-4983-9729-6937fe9e02c8" />
-<img width="1818" height="894" alt="25 02 2026_00 22 43_REC" src="https://github.com/user-attachments/assets/d421cc93-3405-4983-9729-6937fe9e02c8" />
 
 <img width="1820" height="817" alt="25 02 2026_00 23 14_REC" src="https://github.com/user-attachments/assets/1a54faa5-2464-42be-a3e9-02f39a9b2bc2" />
-<img width="1820" height="817" alt="25 02 2026_00 23 14_REC" src="https://github.com/user-attachments/assets/1a54faa5-2464-42be-a3e9-02f39a9b2bc2" />
-<img width="1274" height="846" alt="25 02 2026_00 23 57_REC" src="https://github.com/user-attachments/assets/470a3ed6-817f-4646-a84f-481f4dee9578" />
 <img width="1274" height="846" alt="25 02 2026_00 23 57_REC" src="https://github.com/user-attachments/assets/470a3ed6-817f-4646-a84f-481f4dee9578" />
 
 <img width="1256" height="840" alt="25 02 2026_00 24 24_REC" src="https://github.com/user-attachments/assets/11974658-afc9-4e61-a080-4281532198b4" />
-<img width="1256" height="840" alt="25 02 2026_00 24 24_REC" src="https://github.com/user-attachments/assets/11974658-afc9-4e61-a080-4281532198b4" />
 <img width="1288" height="841" alt="25 02 2026_00 24 58_REC" src="https://github.com/user-attachments/assets/018702a4-c3c0-4a28-80d7-193f8ad95f45" />
-<img width="1288" height="841" alt="25 02 2026_00 24 58_REC" src="https://github.com/user-attachments/assets/018702a4-c3c0-4a28-80d7-193f8ad95f45" />
-
-<img width="1325" height="857" alt="25 02 2026_00 25 16_REC" src="https://github.com/user-attachments/assets/8e4b9c0b-f278-43fb-be22-141e20e7204c" />
 <img width="1325" height="857" alt="25 02 2026_00 25 16_REC" src="https://github.com/user-attachments/assets/8e4b9c0b-f278-43fb-be22-141e20e7204c" />
 
 ---
