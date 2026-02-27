@@ -1,20 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 const RecurrenceViewer = ({ data }) => {
+  // State management for user-controlled parameters 
   const [channelX, setChannelX] = useState(0);
-  const [channelY, setChannelY] = useState(0); // Default to 0 for self-recurrence
-  const [timeStart, setTimeStart] = useState(0);
-  const [timeEnd, setTimeEnd] = useState(200);
+  const [channelY, setChannelY] = useState(1);
+  const [timeEnd, setTimeEnd] = useState(500); 
+  const [colorMap, setColorMap] = useState('thermal'); // Default thermal intensity map 
   
-  const [mDim, setMDim] = useState(1);
-  const [tau, setTau] = useState(1);
-  const [epsilon, setEpsilon] = useState(0.1);
-  
-  const [colorMap, setColorMap] = useState('binary');
-  const [dimensions] = useState({ width: 500, height: 500 });
   const canvasRef = useRef(null);
+  const dimensions = { width: 500, height: 500 };
 
-  const normalizedData = useMemo(() => {
+  // Normalize data and names from the input source [cite: 3, 9]
+  const { channels, names } = useMemo(() => {
     if (!data || !data.data || data.data.length === 0) return { channels: [], names: [] };
     return {
       channels: data.data,
@@ -22,161 +19,137 @@ const RecurrenceViewer = ({ data }) => {
     };
   }, [data]);
 
-  const { channels, names } = normalizedData;
-
-  const recurrenceMatrix = useMemo(() => {
-    if (channels.length === 0 || !channels[channelX]) return null;
-    const ch1 = channels[channelX];
-    const ch2 = channels[channelY] !== undefined ? channels[channelY] : channels[channelX];
-
-    const getNorm = (arr) => {
-      const min = Math.min(...arr);
-      const max = Math.max(...arr);
-      const range = max - min || 1;
-      return arr.map(v => (v - min) / range);
-    };
-
-    const normCh1 = getNorm(ch1);
-    const normCh2 = getNorm(ch2);
-    
-    const start = Math.max(0, timeStart);
-    const end = Math.min(normCh1.length, normCh2.length, timeEnd);
-    const N = end - start;
-
-    const validN = N - (mDim - 1) * tau;
-    if (validN <= 0) return null;
-
-    const matrix = [];
-    for (let i = 0; i < validN; i++) {
-      const row = [];
-      for (let j = 0; j < validN; j++) {
-        let sumSq = 0;
-        for (let k = 0; k < mDim; k++) {
-          const valX = normCh1[start + i + k * tau];
-          const valY = normCh2[start + j + k * tau];
-          sumSq += Math.pow(valX - valY, 2);
-        }
-        row.push(Math.sqrt(sumSq));
-      }
-      matrix.push(row);
+  // Color Mapping Logic: Satisfies the requirement for 2D map intensity representation 
+  const getIntensityColor = (factor, map) => {
+    if (map === 'spectral') {
+      return `hsl(${240 - factor * 240}, 100%, 45%)`; // Blue to Red transition
     }
-    return { matrix, size: validN };
-  }, [channels, channelX, channelY, timeStart, timeEnd, mDim, tau]);
-
-  const getColor = (dist) => {
-    if (colorMap === 'binary') return dist < epsilon ? '#000000' : '#FFFFFF';
-    if (dist > epsilon) return '#FFFFFF';
-    const val = Math.max(0, Math.min(1, 1 - (dist / epsilon)));
-    if (colorMap === 'heat') return `rgb(${val * 255}, ${val * 100}, 0)`;
-    return `hsl(${280 - val * 280}, 70%, 50%)`;
+    if (map === 'thermal') {
+      // Classic medical thermal map: Black -> Orange -> Yellow
+      return `rgb(${factor * 255}, ${Math.max(0, factor * 255 - 128) * 2}, 0)`;
+    }
+    return '#2c3e50'; // Standard clinical dark blue/gray
   };
 
+  // Main Drawing Effect: Renders the cumulative scatter plot 
   useEffect(() => {
-    if (!recurrenceMatrix || !canvasRef.current) return;
+    if (channels.length === 0 || !canvasRef.current) return;
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const { matrix, size } = recurrenceMatrix;
-    const cellW = dimensions.width / size;
-    const cellH = dimensions.height / size;
+    const chX = channels[channelX];
+    const chY = channels[channelY] !== undefined ? channels[channelY] : chX;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Background matching standard website light-mode
+    ctx.fillStyle = '#ffffff'; 
+    ctx.fillRect(0, 0, dimensions.width, dimensions.height);
 
-    matrix.forEach((row, i) => {
-      row.forEach((dist, j) => {
-        const color = getColor(dist);
-        if (color !== '#FFFFFF') {
-            ctx.fillStyle = color;
-            ctx.fillRect(j * cellW, i * cellH, cellW + 0.5, cellH + 0.5);
-        }
-      });
-    });
-  }, [recurrenceMatrix, colorMap, epsilon]);
+    // Dynamic scaling for ECG/EEG signals [cite: 3]
+    const getBounds = (arr) => {
+      const min = Math.min(...arr);
+      const max = Math.max(...arr);
+      return { min, range: (max - min) || 1 };
+    };
 
-  const renderColorLegend = () => {
-    if (colorMap === 'binary') {
-      return (
-        <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: 12, height: 12, backgroundColor: '#000' }} />
-            <span>Match (&lt; {epsilon.toFixed(3)})</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: 12, height: 12, backgroundColor: '#fff', border: '1px solid #ccc' }} />
-            <span>Different</span>
-          </div>
-        </div>
-      );
+    const boundsX = getBounds(chX);
+    const boundsY = getBounds(chY);
+
+    // Cumulative plotting loop: draws every point up to the specified time [cite: 13, 14]
+    for (let t = 0; t < timeEnd; t++) {
+      if (t >= chX.length || t >= chY.length) break;
+
+      const x = ((chX[t] - boundsX.min) / boundsX.range) * dimensions.width;
+      const y = dimensions.height - (((chY[t] - boundsY.min) / boundsY.range) * dimensions.height);
+
+      const intensity = t / timeEnd;
+      ctx.fillStyle = getIntensityColor(intensity, colorMap);
+      
+      // Points plotted as cumulative scatter 
+      ctx.fillRect(x, y, 1.8, 1.8);
     }
+  }, [channelX, channelY, timeEnd, colorMap, channels]);
 
-    const grad = colorMap === 'heat' 
-      ? 'linear-gradient(to right, #000, #f60, #ff0)'
-      : 'linear-gradient(to right, #60c, #0c6, #f00)';
+  // Legend component explaining color intensity 
+  const renderLegend = () => {
+    const gradients = {
+      spectral: 'linear-gradient(to right, #0000ff, #00ff00, #ff0000)',
+      thermal: 'linear-gradient(to right, #000, #f60, #ff0)',
+      monochrome: 'linear-gradient(to right, #2c3e50, #2c3e50)'
+    };
 
     return (
-      <div style={{ width: '100%', maxWidth: '300px' }}>
-        <div style={{ height: '10px', width: '100%', background: grad, borderRadius: '5px' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginTop: '5px' }}>
-          <span>Limit ({epsilon.toFixed(2)})</span>
-          <span>Identical (0.0)</span>
+      <div style={{ marginTop: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+        <div style={{ fontSize: '0.85rem', marginBottom: '8px', fontWeight: '600', color: '#495057' }}>
+          Intensity Map: {colorMap.toUpperCase()}
+        </div>
+        <div style={{ height: '10px', width: '100%', background: gradients[colorMap], borderRadius: '5px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginTop: '6px', color: '#6c757d' }}>
+          <span>Past Data (t=0)</span>
+          <span>Current (t={timeEnd})</span>
         </div>
       </div>
     );
   };
 
-  if (channels.length === 0) return <div>No data provided.</div>;
+  if (channels.length === 0) return <div style={{padding: '20px'}}>No signal data loaded.</div>;
 
   return (
-    <div style={{ display: 'flex', gap: '20px', padding: '20px', backgroundColor: '#f8f9fa', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+    <div style={{ 
+      display: 'flex', 
+      gap: '20px', 
+      padding: '20px', 
+      backgroundColor: '#f1f3f5', // Standard website background
+      minHeight: '100vh', 
+      fontFamily: 'system-ui, -apple-system, sans-serif' 
+    }}>
       
-      {/* Sidebar */}
-      <div style={{ width: '300px', background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-        <h3 style={{ margin: '0 0 20px 0', color: '#333' }}>Settings</h3>
-        
-        {/* CHANNEL SELECTORS - BACK IN ACTION */}
+      {/* Sidebar Controls [cite: 8, 9, 15] */}
+      <div style={{ width: '280px', background: '#ffffff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', height: 'fit-content' }}>
+        <h3 style={{ marginTop: 0, color: '#212529', borderBottom: '2px solid #e9ecef', paddingBottom: '10px' }}>Settings</h3>
+
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Horizontal Channel (X)</label>
-          <select value={channelX} onChange={e => setChannelX(Number(e.target.value))} style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: '#495057' }}>Channel X (Horizontal)</label>
+          <select value={channelX} onChange={e => setChannelX(Number(e.target.value))} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ced4da' }}>
+            {names.map((n, i) => <option key={i} value={i}>{n}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: '#495057' }}>Channel Y (Vertical)</label>
+          <select value={channelY} onChange={e => setChannelY(Number(e.target.value))} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ced4da' }}>
             {names.map((n, i) => <option key={i} value={i}>{n}</option>)}
           </select>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Vertical Channel (Y)</label>
-          <select value={channelY} onChange={e => setChannelY(Number(e.target.value))} style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
-            {names.map((n, i) => <option key={i} value={i}>{n}</option>)}
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: '#495057' }}>Accumulated Time: {timeEnd}</label>
+          <input type="range" min="10" max={channels[0]?.length || 1000} value={timeEnd} onChange={e => setTimeEnd(Number(e.target.value))} style={{ width: '100%' }} />
+        </div>
+
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: '#495057' }}>Color Map Selection</label>
+          <select value={colorMap} onChange={e => setColorMap(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ced4da' }}>
+            <option value="thermal">Thermal (Recommended)</option>
+            <option value="spectral">Spectral (Time Flow)</option>
+            <option value="monochrome">Clinical (Static)</option>
           </select>
         </div>
 
-        <hr />
-
-        <div style={{ margin: '20px 0' }}>
-            <label style={{ fontSize: '0.85rem' }}>Threshold ($\epsilon$): {epsilon.toFixed(3)}</label>
-            <input type="range" min="0.001" max="0.5" step="0.001" value={epsilon} onChange={e => setEpsilon(Number(e.target.value))} style={{ width: '100%' }} />
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-            <label style={{ fontSize: '0.85rem' }}>Embedding ($m$): {mDim}</label>
-            <input type="range" min="1" max="5" value={mDim} onChange={e => setMDim(Number(e.target.value))} style={{ width: '100%' }} />
-        </div>
-
-        <select value={colorMap} onChange={e => setColorMap(e.target.value)} style={{ width: '100%', padding: '8px' }}>
-          <option value="binary">Binary (Dots)</option>
-          <option value="viridis">Plasma (Distance)</option>
-          <option value="heat">Thermal (Heat)</option>
-        </select>
+        {renderLegend()}
       </div>
 
-      {/* Main Plot */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ marginBottom: '10px', color: '#666' }}>{names[channelX]} vs {names[channelY]}</div>
+      {/* Main Plot Area [cite: 9] */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#ffffff', borderRadius: '12px', padding: '30px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+        <div style={{ marginBottom: '20px', fontSize: '1.1rem', fontWeight: '600', color: '#212529' }}>
+          Reoccurrence: {names[channelX]} vs {names[channelY]}
+        </div>
         
-        <div style={{ position: 'relative', border: '1px solid #ddd', background: '#fff' }}>
+        <div style={{ border: '1px solid #dee2e6', borderRadius: '4px', background: '#fff' }}>
           <canvas ref={canvasRef} width={dimensions.width} height={dimensions.height} />
         </div>
-
-        <div style={{ marginTop: '20px', padding: '15px', background: 'white', borderRadius: '10px' }}>
-          {renderColorLegend()}
+        
+        <div style={{ marginTop: '20px', color: '#adb5bd', fontSize: '0.75rem' }}>
+          Visualizing relationship between {names[channelX]} and {names[channelY]} 
         </div>
       </div>
     </div>
