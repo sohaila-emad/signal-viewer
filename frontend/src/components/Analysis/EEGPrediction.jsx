@@ -61,7 +61,9 @@ const EEGPrediction = ({ signalData }) => {
   };
 
   const formatClassName = (name) => {
-    return name.replace(/_/g, ' ');
+    // return name.replace(/_/g, ' ');
+  if (!name) return 'unknown';
+  return name.replace(/_/g, ' ');
   };
 
   return (
@@ -163,7 +165,7 @@ const EEGPrediction = ({ signalData }) => {
             <span style={{ fontSize: '20px' }}>{comp.agreement ? '✓' : '⚠'}</span>
             <div>
               <div style={{ fontWeight: 'bold', color: comp.agreement ? '#2e7d32' : '#e65100' }}>
-                {comp.agreement ? 'Models Agree' : 'Models Disagree'}
+                {comp.agreement ?   'Models Agree' : 'Models Disagree'}
               </div>
               <div style={{ fontSize: '12px', color: '#555' }}>
                 {comp.confidence_source}

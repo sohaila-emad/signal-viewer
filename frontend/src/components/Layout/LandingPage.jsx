@@ -127,7 +127,7 @@ const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType 
             id="file-input"
             onChange={handleFileInput}
             multiple
-            accept=".csv,.txt,.wav,.mp3,.edf,.hea,.dat,.xlsx,.json"
+            accept=".csv,.txt,.wav,.mp3,.edf,.hea,.dat,.xlsx,.json,.npy"
             style={{ display: 'none' }}
           />
           
@@ -142,7 +142,12 @@ const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType 
               Browse Files
             </button>
             <p className="file-hint">
-              Supported formats: CSV, TXT, WAV, MP3, EDF, XLSX, JSON
+              {/* Supported formats: CSV, TXT, WAV, MP3, EDF, XLSX, JSON */}
+              {signalType === 'medical' && 'Supported: CSV, EDF, WFDB (.hea + .dat)'}
+              {signalType === 'eeg' && 'Supported: NPY, EDF, CSV'}
+              {signalType === 'acoustic' && 'Supported: WAV, MP3, CSV'}
+              {signalType === 'stock' && 'Supported: CSV, JSON, XLSX'}
+              {signalType === 'microbiome' && 'Supported: CSV, JSON'}
             </p>
           </div>
         </div>

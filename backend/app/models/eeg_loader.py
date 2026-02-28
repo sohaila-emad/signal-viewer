@@ -71,19 +71,29 @@ class BIOTLoader:
             return False
 
         try:
-            # Load checkpoint
+             #Load checkpoint
             checkpoint = torch.load(model_path, map_location=self.device)
             
-            # Initialize the base BIOT model (pretrained on six datasets)
-            self.model = BIOT.from_pretrained(
-                "braindecode/biot-pretrained-six-datasets-18chs",
-                n_outputs=2,  # dummy, will be replaced
-                n_chans=self.n_chans,
-                n_times=self.window_samples,
-                sfreq=self.sfreq,
-                hop_length=self.hop_length,
-                # token_size=self.token_size,
+            self.model = BIOT(
+            n_outputs=self.num_classes,
+            n_chans=self.n_chans,
+            n_times=self.window_samples,
+            sfreq=self.sfreq,
+            hop_length=self.hop_length,
+            # token_size=self.token_size,
+        
             )
+            
+            # # Initialize the base BIOT model (pretrained on six datasets)
+            # self.model = BIOT.from_pretrained(
+            #     "braindecode/biot-pretrained-six-datasets-18chs",
+            #     n_outputs=2,  # dummy, will be replaced
+            #     n_chans=self.n_chans,
+            #     n_times=self.window_samples,
+            #     sfreq=self.sfreq,
+            #     hop_length=self.hop_length,
+            #     # token_size=self.token_size,
+            # )
 
             # Replace classification head to match number of classes
             in_features = self.model.final_layer.classification_head.in_features
@@ -93,8 +103,6 @@ class BIOTLoader:
             if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
                 self.model.load_state_dict(checkpoint['model_state_dict'])
             elif isinstance(checkpoint, dict):
-                self.model.load_state_dict(checkpoint)
-            else:
                 self.model.load_state_dict(checkpoint)
 
             self.model.to(self.device)

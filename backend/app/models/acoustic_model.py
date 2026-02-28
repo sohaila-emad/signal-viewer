@@ -4,7 +4,7 @@ Acoustic Models for Signal Processing
 - Vehicle sound analysis
 - Drone/Submarine detection
 """
-
+import os
 import numpy as np
 from scipy import signal
 from scipy.fft import fft, fftfreq
@@ -234,7 +234,9 @@ class DroneDetector:
 
     def __init__(self):
         
-        self.model = tf.keras.models.load_model("..\models\drone_detector.h5")
+        base = os.path.dirname(os.path.abspath(__file__))
+        self.model = tf.keras.models.load_model(os.path.join(base, "..", "..", "..", "models", "drone_detector.h5"), compile=False)
+        # self.model = tf.keras.models.load_model("..\..\models\drone_detector.h5")
 
     def detect(self, audio_data: np.ndarray, sample_rate: int = 44100) -> dict:
         """
