@@ -28,7 +28,7 @@ def create_app():
     app.register_blueprint(medical_bp, url_prefix='/api/medical')
     app.register_blueprint(acoustic_bp, url_prefix='/api/acoustic')
     app.register_blueprint(upload_bp, url_prefix='/api')
-    app.register_blueprint(stock_bp, url_prefix='/api/stock')
+    app.register_blueprint(stock_bp, url_prefix="/api/stocks")
     app.register_blueprint(microbiome_bp, url_prefix='/api/microbiome')
     
     @app.route('/')
