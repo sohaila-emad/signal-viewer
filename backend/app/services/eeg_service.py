@@ -63,7 +63,19 @@ class EEGService:
             # Probably time x channels -> convert to channels x time
             data = data.T
 
+        # Warn if more than 18 channels — models use only 18
+        n_leads = data.shape[0]
+        warnings_list = []
+        if n_leads > 18:
+            msg = (f"Input has {n_leads} leads/channels. Models require exactly 18 — "
+                   f"{n_leads - 18} extra lead(s) will be dropped in AI analysis.")
+            warnings_list.append(msg)
+            print(f"⚠ {msg}")
+
         results = {}
+        if warnings_list:
+            results['warnings'] = warnings_list
+
         if self.biot_loader is not None:
             results['biot'] = self.biot_loader.predict(data, fs, temperature)
         if self.rf_loader is not None:

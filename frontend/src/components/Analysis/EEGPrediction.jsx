@@ -54,6 +54,7 @@ const EEGPrediction = ({ signalData }) => {
   const biot = prediction.biot;
   const rf = prediction.random_forest;
   const comp = prediction.comparison;
+  const predictionWarnings = prediction.warnings || [];
 
   const getColorForPrediction = (pred) => {
     if (pred === 'normal') return '#4CAF50';
@@ -71,6 +72,15 @@ const EEGPrediction = ({ signalData }) => {
       <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <span>🧠</span> EEG Analysis (Ensemble)
       </h3>
+
+      {predictionWarnings.length > 0 && (
+        <div style={{
+          background: '#fff8e1', border: '1px solid #ffc107', borderRadius: '4px',
+          padding: '8px 12px', marginBottom: '10px', fontSize: '0.85em', color: '#5d4037'
+        }}>
+          {predictionWarnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+        </div>
+      )}
 
       <div className="prediction-grid" style={{
         display: 'grid',

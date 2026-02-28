@@ -37,10 +37,12 @@ function App() {
   };
 
   const handleFileSelected = async (file) => {
-    console.log('📁 File selected from landing:', file.name);
-    
+    // Accept either a single File or an array of Files
+    const files = Array.isArray(file) ? file : [file];
+    console.log('📁 File(s) selected from landing:', files.map(f => f.name).join(', '));
+
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(f => formData.append('file', f));
     formData.append('type', activeTab);
 
     try {
@@ -265,7 +267,7 @@ function App() {
                   </div>
                 )
               )}
-              // added eeg part here
+              {/*  added eeg part here */}
               {activeTab === 'eeg' && (
   signalData ? (
     <div className="viewer-container">

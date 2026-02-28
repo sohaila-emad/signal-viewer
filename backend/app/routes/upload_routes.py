@@ -506,12 +506,18 @@ def upload_file():
         
         # Process the primary file (first file or .hea file for WFDB)
         primary_file = saved_files[0]
-        
+
         # For WFDB, prefer processing the .hea file
         if signal_type == 'medical':
             hea_file = next((f for f in saved_files if f[1].endswith('.hea')), None)
             if hea_file:
                 primary_file = hea_file
+
+        # For EEG, prefer the main .npy file (not the _sfreq.npy companion)
+        if signal_type == 'eeg':
+            main_npy = next((f for f in saved_files if f[1].endswith('.npy') and '_sfreq' not in f[1]), None)
+            if main_npy:
+                primary_file = main_npy
         
         result = processor(primary_file[0], primary_file[1])
         

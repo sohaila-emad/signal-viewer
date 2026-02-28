@@ -1,5 +1,14 @@
 import React, { useMemo } from 'react';
 
+// Format a number: use scientific notation if very small/large, otherwise fixed
+const formatVal = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '0';
+  const abs = Math.abs(n);
+  if (abs === 0) return '0';
+  if (abs < 0.001 || abs >= 1e6) return n.toExponential(3);
+  return n.toFixed(4);
+};
+
 const SignalInfo = ({ data }) => {
   if (!data) return null;
 
@@ -15,19 +24,19 @@ const SignalInfo = ({ data }) => {
   // Use useMemo to prevent recalculating on every render
   const stats = useMemo(() => {
     if (!data.data || !data.data[0]) return { min: 0, max: 0, mean: 0 };
-    
+
     try {
       // Take only first 1000 samples from first channel to avoid stack overflow
       const firstChannel = data.data[0];
       const samples = firstChannel.slice(0, 1000);
-      
+
       if (samples.length === 0) return { min: 0, max: 0, mean: 0 };
-      
-      const min = Math.min(...samples).toFixed(3);
-      const max = Math.max(...samples).toFixed(3);
+
+      const min = Math.min(...samples);
+      const max = Math.max(...samples);
       const sum = samples.reduce((a, b) => a + b, 0);
-      const mean = (sum / samples.length).toFixed(3);
-      
+      const mean = sum / samples.length;
+
       return { min, max, mean };
     } catch (error) {
       console.error('Error calculating stats:', error);
@@ -78,15 +87,15 @@ const SignalInfo = ({ data }) => {
         <div className="stats-grid">
           <div className="stat-box">
             <span className="stat-label">Min</span>
-            <span className="stat-number">{stats.min}</span>
+            <span className="stat-number">{formatVal(stats.min)}</span>
           </div>
           <div className="stat-box">
             <span className="stat-label">Max</span>
-            <span className="stat-number">{stats.max}</span>
+            <span className="stat-number">{formatVal(stats.max)}</span>
           </div>
           <div className="stat-box">
             <span className="stat-label">Mean</span>
-            <span className="stat-number">{stats.mean}</span>
+            <span className="stat-number">{formatVal(stats.mean)}</span>
           </div>
         </div>
       </div>

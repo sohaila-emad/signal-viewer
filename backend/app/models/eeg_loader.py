@@ -375,7 +375,10 @@ class EEGRandomForestLoader:
             prob_dict = {}
             if hasattr(self.model, 'predict_proba'):
                 for i, p in enumerate(avg_probs):
-                    class_name = self.ABNORMALITY_CLASSES.get(int(classes[i]), f'class_{classes[i]}')
+                    if i < len(classes):
+                        class_name = self.ABNORMALITY_CLASSES.get(int(classes[i]), f'class_{classes[i]}')
+                    else:
+                        class_name = f'class_{i}'
                     prob_dict[class_name] = float(p)
             else:
                 prob_dict[prediction] = 1.0

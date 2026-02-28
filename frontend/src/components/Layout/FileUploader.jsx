@@ -19,6 +19,7 @@ const FileUploader = forwardRef(({ onDataLoaded, signalType }, ref) => {
 
   const sizeLimits = {
     medical: 500,
+    eeg: 500,
     acoustic: 200,
     stock: 100,
     microbiome: 500
@@ -48,16 +49,24 @@ const FileUploader = forwardRef(({ onDataLoaded, signalType }, ref) => {
       return false;
     }
 
-    // Check for WFDB files
     if (selectedFiles.length > 1) {
       const names = selectedFiles.map(f => f.name);
       const hasHea = names.some(f => f.endsWith('.hea'));
       const hasDat = names.some(f => f.endsWith('.dat'));
+      const allNpy = names.every(f => f.endsWith('.npy'));
 
-      if (!hasHea || !hasDat) {
-        setError(`Both .hea and .dat required. You have: ${names.join(', ')}`);
+      // If any WFDB file is present, require the pair
+      if (hasHea || hasDat) {
+        if (!hasHea || !hasDat) {
+          setError(`Both .hea and .dat required. You have: ${names.join(', ')}`);
+          return false;
+        }
+      } else if (!allNpy) {
+        // Non-WFDB, non-NPY multi-file combo — just warn but allow
+        setError(`Unexpected file combination: ${names.join(', ')}. Expected .hea+.dat or .npy+sfreq.npy.`);
         return false;
       }
+      // allNpy is fine: main .npy + _sfreq.npy companion
     }
 
     // Check sizes
@@ -247,7 +256,14 @@ const FileUploader = forwardRef(({ onDataLoaded, signalType }, ref) => {
 
       {/* INFO */}
       <div style={{ marginTop: '15px', fontSize: '0.8em', color: '#666', lineHeight: '1.5' }}>
-        <strong>Formats:</strong> CSV, EDF, MAT {signalType === 'medical' && '(+ WFDB)'} | Max: {sizeLimits[signalType]}MB
+        <strong>Formats:</strong>{' '}
+        {signalType === 'medical' && 'CSV, EDF, MAT, NPY, WFDB (.hea+.dat)'}
+        {signalType === 'eeg' && 'NPY (+sfreq.npy), EDF, CSV, WFDB (.hea+.dat)'}
+        {signalType === 'acoustic' && 'WAV, MP3'}
+        {signalType === 'stock' && 'CSV, XLSX'}
+        {signalType === 'microbiome' && 'TSV, BIOM, FASTA'}
+        {!['medical','eeg','acoustic','stock','microbiome'].includes(signalType) && 'CSV, EDF, MAT, NPY'}
+        {' '}| Max: {sizeLimits[signalType]}MB
       </div>
     </div>
   );

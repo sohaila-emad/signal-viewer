@@ -46,10 +46,11 @@ const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType 
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      console.log('File dropped:', e.dataTransfer.files[0].name);
-      onFileSelected(e.dataTransfer.files[0]);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      console.log('Files dropped:', files.map(f => f.name).join(', '));
+      onFileSelected(files);
     }
   };
 
@@ -58,10 +59,8 @@ const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType 
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
       console.log(`Files selected: ${files.map(f => f.name).join(', ')}`);
-      // Send all files at once
-      for (let file of files) {
-        onFileSelected(file);
-      }
+      // Pass all files as a batch so pairs like .hea+.dat or .npy+sfreq.npy work
+      onFileSelected(files);
     }
   };
 
