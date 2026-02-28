@@ -1,190 +1,119 @@
 """
-Microbiome Service for Signal Processing
-Provides service layer for microbiome data analysis
+Microbiome Service — auto-loads the bundled iHMP longitudinal dataset.
+
+No file upload required. Data is read from data/ihmp_longitudinal.csv at startup.
 """
 
-import pandas as pd
 from typing import Dict, List, Optional
-from app.models.microbiome_model import (
-    MicrobiomeDataLoader,
-    MicrobiomeAnalyzer,
-    load_microbiome_data,
-    analyze_microbiome,
-    estimate_patient
+from ..models.microbiome_model import (
+    IHMPDataset,
+    get_longitudinal_data,
+    calculate_trends,
+    estimate_patient_profile,
 )
 
 
 class MicrobiomeService:
-    """Service for microbiome data operations."""
-    
+
     def __init__(self):
-        self.data_loader = MicrobiomeDataLoader()
-        self.analyzer = MicrobiomeAnalyzer()
-        self.current_data = None
-    
-    def load_data(self, n_samples: int = 100) -> Dict:
-        """
-        Load microbiome data.
-        
-        Args:
-            n_samples: Number of samples to generate
-            
-        Returns:
-            Dictionary with microbiome data
-        """
-        try:
-            result = load_microbiome_data(n_samples)
-            self.current_data = result
-            return result
-        except Exception as e:
-            return {'error': str(e)}
-    
-    def get_sample(self, sample_id: str) -> Dict:
-        """Get a specific sample by ID."""
-        if self.current_data is None:
-            # Load default data
-            self.load_data()
-        
-        for sample in self.current_data.get('data', []):
-            if sample.get('sample_id') == sample_id:
-                return sample
-        
-        return {'error': 'Sample not found'}
-    
-    def get_diversity_analysis(self, sample_id: Optional[str] = None) -> Dict:
-        """
-        Get diversity analysis for samples.
-        
-        Args:
-            sample_id: Optional specific sample ID
-            
-        Returns:
-            Diversity analysis results
-        """
-        if self.current_data is None:
-            self.load_data()
-        
-        diversity = self.current_data.get('diversity', [])
-        
-        if sample_id:
-            for d in diversity:
-                if d.get('sample_id') == sample_id:
-                    return d
-            return {'error': 'Sample not found'}
-        
+        self._dataset: IHMPDataset = IHMPDataset()
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+
+    def get_summary(self) -> Dict:
+        participants = self._dataset.participant_ids()
+        genera       = self._dataset.all_genera()
+        n_visits     = sum(
+            len(self._dataset.visits_for_participant(p)) for p in participants
+        )
         return {
-            'samples': diversity,
-            'average_shannon': sum(d.get('shannon_index', 0) for d in diversity) / len(diversity) if diversity else 0,
-            'average_simpson': sum(d.get('simpson_index', 0) for d in diversity) / len(diversity) if diversity else 0
-        }
-    
-    def analyze_sample(self, sample_data: Dict) -> Dict:
-        """
-        Analyze a microbiome sample.
-        
-        Args:
-            sample_data: Sample data with bacterial abundances
-            
-        Returns:
-            Analysis results
-        """
-        try:
-            return analyze_microbiome(sample_data)
-        except Exception as e:
-            return {'error': str(e)}
-    
-    def estimate_patient(self, sample_data: Dict) -> Dict:
-        """
-        Estimate patient profile.
-        
-        Args:
-            sample_data: Sample data with microbiome and metadata
-            
-        Returns:
-            Patient profile estimation
-        """
-        try:
-            return estimate_patient(sample_data)
-        except Exception as e:
-            return {'error': str(e)}
-    
-    def compare_samples(self, sample1_id: str, sample2_id: str) -> Dict:
-        """
-        Compare two samples.
-        
-        Args:
-            sample1_id: First sample ID
-            sample2_id: Second sample ID
-            
-        Returns:
-            Comparison results
-        """
-        if self.current_data is None:
-            self.load_data()
-        
-        sample1 = None
-        sample2 = None
-        
-        for s in self.current_data.get('data', []):
-            if s.get('sample_id') == sample1_id:
-                sample1 = s
-            if s.get('sample_id') == sample2_id:
-                sample2 = s
-        
-        if sample1 is None or sample2 is None:
-            return {'error': 'One or both samples not found'}
-        
-        try:
-            return self.analyzer.compare_samples(sample1, sample2)
-        except Exception as e:
-            return {'error': str(e)}
-    
-    def get_disease_profiles(self) -> Dict:
-        """Get available disease profiles."""
-        return self.data_loader.DISEASE_PROFILES
-    
-    def get_bacterial_taxonomy(self) -> Dict:
-        """Get bacterial taxonomy information."""
-        return {
-            'phyla': self.data_loader.COMMON_PHYLA,
-            'genera': self.data_loader.COMMON_GENERA
-        }
-    
-    def get_statistics(self) -> Dict:
-        """Get overall statistics about the microbiome data."""
-        if self.current_data is None:
-            self.load_data()
-        
-        data = self.current_data.get('data', [])
-        
-        if not data:
-            return {'error': 'No data available'}
-        
-        # Calculate statistics
-        ages = [s.get('age', 0) for s in data]
-        bmis = [s.get('bmi', 0) for s in data]
-        
-        # Disease distribution
-        disease_counts = {}
-        for s in data:
-            disease = s.get('disease_status', 'Unknown')
-            disease_counts[disease] = disease_counts.get(disease, 0) + 1
-        
-        return {
-            'n_samples': len(data),
-            'n_subjects': len(set(s.get('subject_id', '') for s in data)),
-            'age_range': [min(ages), max(ages)] if ages else [0, 0],
-            'age_mean': sum(ages) / len(ages) if ages else 0,
-            'bmi_range': [min(bmis), max(bmis)] if bmis else [0, 0],
-            'bmi_mean': sum(bmis) / len(bmis) if bmis else 0,
-            'disease_distribution': disease_counts
+            'metadata_loaded':      True,
+            'abundance_loaded':     True,
+            'filename':             'ihmp_longitudinal.csv',
+            'n_participants':       len(participants),
+            'n_samples':            n_visits,
+            'n_genera':             len(genera),
+            'genera':               genera,
+            'n_matched':            len(participants),
+            'n_unmatched':          0,
+            'matched_participants': participants,
         }
 
+    # ── Participant list ──────────────────────────────────────────────────────
 
-# Singleton instance
-microbiome_service = MicrobiomeService()
+    def get_participants(self) -> List[str]:
+        return self._dataset.participant_ids()
+
+    # ── Longitudinal timeline ─────────────────────────────────────────────────
+
+    def get_longitudinal_data(self, participant_id: str, genera: List[str]) -> Dict:
+        visits = get_longitudinal_data(self._dataset, participant_id)
+        if not visits:
+            return {'error': f'No data for participant {participant_id!r}.'}
+
+        timeline = []
+        for v in visits:
+            point: Dict = {
+                'external_id': v['external_id'],
+                'visit_num':   v['visit_num'],
+                'week_num':    v['week_num'],
+                'shannon':     v['shannon'],
+                'label':       f"V{v['visit_num']}",
+            }
+            for g in genera:
+                point[g] = round(v['genera'].get(g, 0.0) * 100, 4)
+            timeline.append(point)
+
+        trends = calculate_trends(visits)
+        return {
+            'participant_id': participant_id,
+            'timeline':       timeline,
+            'trends':         trends,
+            'n_visits':       len(visits),
+        }
+
+    # ── Patient profile ───────────────────────────────────────────────────────
+
+    def get_patient_profile(self, participant_id: str) -> Dict:
+        visits = get_longitudinal_data(self._dataset, participant_id)
+        if not visits:
+            return {'error': f'No data for participant {participant_id!r}.'}
+
+        info       = self._dataset.participant_info(participant_id)
+        latest     = visits[-1]
+        formula    = estimate_patient_profile(latest['genera'])
+        top_genera = sorted(latest['genera'].items(), key=lambda x: x[1], reverse=True)[:8]
+
+        return {
+            **info,
+            'sex':                None,
+            'consent_age':        None,
+            'bmi':                None,
+            'site_name':          None,
+            'latest_external_id': latest['external_id'],
+            'latest_visit_num':   latest['visit_num'],
+            'latest_week_num':    latest['week_num'],
+            'n_visits_in_file':   len(visits),
+            'top_genera': [
+                {'genus': g, 'abundance_pct': round(a * 100, 3)}
+                for g, a in top_genera
+            ],
+            **formula,
+        }
+
+    # ── Mean composition ──────────────────────────────────────────────────────
+
+    def get_composition(self) -> List[Dict]:
+        return self._dataset.mean_composition()
+
+
+# ── Singleton ─────────────────────────────────────────────────────────────────
+
+_service: Optional[MicrobiomeService] = None
 
 
 def get_microbiome_service() -> MicrobiomeService:
-    """Get the microbiome service instance."""
-    return microbiome_service
+    global _service
+    if _service is None:
+        _service = MicrobiomeService()
+    return _service

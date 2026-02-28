@@ -82,14 +82,22 @@ function App() {
     setSignalData(null);
   };
 
+  // Microbiome has bundled data — no upload required; navigate directly.
+  const handleSignalTypeChange = (type) => {
+    setActiveTab(type);
+    if (type === 'microbiome') {
+      setShowLanding(false);
+    }
+  };
+
   return (
     <div className="app">
       {showLanding ? (
-        <LandingPage 
+        <LandingPage
           onFileSelected={handleFileSelected}
           onSampleClick={handleSampleClick}
           signalType={activeTab}
-          setSignalType={setActiveTab}
+          setSignalType={handleSignalTypeChange}
         />
       ) : (
         <>
@@ -141,14 +149,15 @@ function App() {
           </header>
           
           <main className="app-main">
-            {/* Left Sidebar - Upload & Info */}
+            {/* Left Sidebar - hidden for microbiome (uses bundled data, no upload needed) */}
+            {activeTab !== 'microbiome' && (
             <div className="sidebar">
               <div className="sidebar-section">
                 <h3 className="sidebar-title">
                   <span className="title-icon">📂</span>
                   Upload Signal
                 </h3>
-                <FileUploader 
+                <FileUploader
                   onDataLoaded={handleDataLoaded}
                   signalType={activeTab}
                 />
@@ -168,10 +177,10 @@ function App() {
                       </h3>
                       <div className="history-list">
                         {uploadHistory.map(entry => (
-                          <div 
-                            key={entry.id} 
+                          <div
+                            key={entry.id}
                             className={`history-item ${signalData.filename === entry.filename ? 'active' : ''}`}
-                            onClick={() => setSignalData(entry)} // Click to load previous file
+                            onClick={() => setSignalData(entry)}
                           >
                             <div className="history-icon">
                               {entry.type === 'medical' ? '❤️' : entry.type === 'acoustic' ? '🎵' : '📈'}
@@ -194,6 +203,7 @@ function App() {
                 </>
               )}
             </div>
+            )}
             
             {/* Main Viewer Area - Show different pages based on activeTab */}
             <div className="viewer-area">

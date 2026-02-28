@@ -1,727 +1,526 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { microbiomeAPI } from '../../services/api';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+import {
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts';
 
+const COLORS = [
+  '#4ecdc4','#ff6b6b','#45b7d1','#ffeaa7',
+  '#96ceb4','#fd79a8','#a29bfe','#fdcb6e',
+  '#55efc4','#e17055','#74b9ff','#fab1a0',
+];
+
+const CARD = {
+  padding: '20px',
+  backgroundColor: 'white',
+  borderRadius: '8px',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+};
+
+const DX_COLOR = { CD: '#e17055', UC: '#fdcb6e', nonIBD: '#55efc4', IBD: '#e17055', Obesity: '#fdcb6e', Healthy: '#55efc4', CVD: '#a29bfe', Type2Diabetes: '#ff6b6b' };
+
+const fmt = (v) => {
+  if (v === null || v === undefined) return 'N/A';
+  if (typeof v !== 'number') return String(v);
+  if (Math.abs(v) < 0.0001) return v.toExponential(3);
+  return v.toFixed(4);
+};
+
+const MetricRow = ({ label, value, unit = '', info = '' }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    padding: '8px 12px', marginBottom: '6px',
+    backgroundColor: '#f7f9fc', borderRadius: '6px', fontSize: '0.88rem',
+  }}>
+    <div>
+      <span style={{ fontWeight: 'bold' }}>{label}</span>
+      {info && <div style={{ color: '#636e72', fontSize: '0.78rem', marginTop: '2px' }}>{info}</div>}
+    </div>
+    <span style={{ fontWeight: 'bold', color: '#2d3436', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+      {fmt(value)}{unit}
+    </span>
+  </div>
+);
+
+// ── Main component ────────────────────────────────────────────────────────────
 const MicrobiomePage = () => {
-  const [samples, setSamples] = useState([]);
-  const [selectedSample, setSelectedSample] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('dashboard');
-  
-  // Data states
-  const [summary, setSummary] = useState(null);
-  const [composition, setComposition] = useState([]);
-  const [diversity, setDiversity] = useState([]);
-  const [diseases, setDiseases] = useState({});
-  const [taxa, setTaxa] = useState({ phyla: [], genera: [] });
-  const [patientProfile, setPatientProfile] = useState(null);
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [summary, setSummary]     = useState(null);
+  const [composition, setComp]    = useState([]);
+  const [error, setError]         = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [tab, setTab]             = useState('overview');
 
-  // Form state for custom sample
-  const [customSample, setCustomSample] = useState({
-    Bacteroides: 0.15,
-    Prevotella: 0.10,
-    Faecalibacterium: 0.12,
-    Bifidobacterium: 0.08,
-    Lactobacillus: 0.10,
-    Escherichia: 0.05,
-    Streptococcus: 0.05,
-    Clostridium: 0.08,
-    Ruminococcus: 0.07,
-    Akkermansia: 0.05,
-    Blautia: 0.08,
-    Roseburia: 0.07
-  });
+  // Timeline
+  const [participant, setParticipant] = useState('');
+  const [participants, setParticipants] = useState([]);
+  const [selectedGenera, setSelectedGenera] = useState([]);
+  const [tlData, setTlData]       = useState(null);
+  const [tlLoading, setTlLoading] = useState(false);
+  const [pickerExpanded, setPickerExpanded] = useState(false);
 
-  // Load initial data
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  // Profile
+  const [profParticipant, setProfParticipant] = useState('');
+  const [profile, setProfile]     = useState(null);
+  const [profLoading, setProfLoading] = useState(false);
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  // ── Initial load ─────────────────────────────────────────────────────────────
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await microbiomeAPI.getSummary();
+      setSummary(res.data);
+      setError(null);
+
+      const [compRes, partRes] = await Promise.all([
+        microbiomeAPI.getComposition(),
+        microbiomeAPI.getParticipants(),
+      ]);
+      setComp(compRes.data || []);
+      const ids = partRes.data.participants || [];
+      setParticipants(ids);
+      if (ids.length && !participant) {
+        setParticipant(ids[0]);
+        setProfParticipant(ids[0]);
+      }
+      if (!selectedGenera.length && res.data.genera?.length) {
+        setSelectedGenera(res.data.genera.slice(0, 5));
+      }
+    } catch (err) {
+      setError('Backend error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [participant, selectedGenera.length]);
+
+  useEffect(() => { fetchSummary(); }, []);
+
+  // ── Timeline ─────────────────────────────────────────────────────────────────
+  const fetchTimeline = useCallback(async (pid, genera) => {
+    if (!pid || !genera.length) return;
+    setTlLoading(true);
     setError(null);
     try {
-      // Load all required data
-      const [summaryRes, compositionRes, diversityRes, diseasesRes, taxaRes, samplesRes] = await Promise.all([
-        microbiomeAPI.getSummary(),
-        microbiomeAPI.getComposition(),
-        microbiomeAPI.getDiversity(),
-        microbiomeAPI.getDiseases(),
-        microbiomeAPI.getTaxa(),
-        microbiomeAPI.getSamples()
-      ]);
-
-      setSummary(summaryRes.data);
-      setComposition(compositionRes.data.composition || []);
-      setDiversity(diversityRes.data.samples || []);
-      setDiseases(diseasesRes.data);
-      setTaxa(taxaRes.data);
-      setSamples(samplesRes.data.samples || []);
+      const res = await microbiomeAPI.getTimeline(pid, genera);
+      setTlData(res.data);
     } catch (err) {
-      console.error('Error loading dashboard:', err);
-      setError('Failed to load data: ' + err.message);
+      setError('Timeline error: ' + (err.response?.data?.error || err.message));
     } finally {
-      setLoading(false);
+      setTlLoading(false);
+    }
+  }, []);
+
+  const handleParticipantChange = (pid) => {
+    setParticipant(pid);
+    setTlData(null);
+    fetchTimeline(pid, selectedGenera);
+  };
+
+  const toggleGenus = (genus) => {
+    const next = selectedGenera.includes(genus)
+      ? selectedGenera.filter(g => g !== genus)
+      : [...selectedGenera, genus];
+    setSelectedGenera(next);
+    if (next.length && participant) fetchTimeline(participant, next);
+  };
+
+  const handleTabChange = (t) => {
+    setTab(t);
+    if (t === 'timeline' && participant && !tlData) {
+      fetchTimeline(participant, selectedGenera);
     }
   };
 
-  const handleSelectSample = async (sample) => {
-    setSelectedSample(sample);
+  // ── Profile ───────────────────────────────────────────────────────────────────
+  const fetchProfile = useCallback(async (pid) => {
+    if (!pid) return;
+    setProfLoading(true);
+    setError(null);
     try {
-      const response = await microbiomeAPI.estimatePatient(sample);
-      setPatientProfile(response.data);
+      const res = await microbiomeAPI.getParticipantProfile(pid);
+      setProfile(res.data);
     } catch (err) {
-      console.error('Error analyzing sample:', err);
-    }
-  };
-
-  const handleAnalyzeCustom = async () => {
-    setLoading(true);
-    try {
-      const response = await microbiomeAPI.analyze(customSample);
-      setAnalysisResult(response.data);
-    } catch (err) {
-      console.error('Error analyzing:', err);
+      setError('Profile error: ' + (err.response?.data?.error || err.message));
     } finally {
-      setLoading(false);
+      setProfLoading(false);
     }
+  }, []);
+
+  const handleProfParticipantChange = (pid) => {
+    setProfParticipant(pid);
+    setProfile(null);
+    fetchProfile(pid);
   };
 
-  const handleEstimatePatient = async () => {
-    setLoading(true);
-    try {
-      const sampleData = {
-        ...customSample,
-        age: 35,
-        bmi: 24
-      };
-      const response = await microbiomeAPI.estimatePatient(sampleData);
-      setPatientProfile(response.data);
-      setViewMode('patient');
-    } catch (err) {
-      console.error('Error estimating patient:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Color palette
-  const colors = ['#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#ff6b6b', '#74b9ff', '#a29bfe', '#fd79a8', '#fdcb6e', '#00b894', '#e17055', '#0984e3'];
-
-  // Prepare disease distribution data for pie chart
-  const diseaseDistribution = summary?.disease_distribution ? 
-    Object.entries(summary.disease_distribution).map(([name, value], index) => ({
-      name,
-      value,
-      color: colors[index % colors.length]
-    })) : [];
-
-  // Prepare composition data for charts
-  const topComposition = composition.slice(0, 8).map((item, index) => ({
-    ...item,
-    color: colors[index % colors.length]
+  // ── Derived ───────────────────────────────────────────────────────────────────
+  const compBarData = composition.slice(0, 15).map(c => ({
+    genus: c.genus,
+    abundance: parseFloat((c.mean_abundance * 100).toFixed(3)),
   }));
 
+  const timelineChart = (tlData?.timeline || []).map(pt => {
+    const row = { label: pt.label, shannon: pt.shannon };
+    selectedGenera.forEach(g => { row[g] = pt[g] ?? 0; });
+    return row;
+  });
+
+  const sortedGenera = composition.length
+    ? composition.map(c => c.genus).filter(g => (summary?.genera || []).includes(g))
+    : (summary?.genera || []);
+
+  const COLLAPSED_COUNT = 5;
+  const visibleGenera = pickerExpanded ? sortedGenera : sortedGenera.slice(0, COLLAPSED_COUNT);
+
+  const selectTop5 = () => { const n = sortedGenera.slice(0, 5); setSelectedGenera(n); if (participant) fetchTimeline(participant, n); };
+  const selectAll  = () => { const n = [...sortedGenera];         setSelectedGenera(n); if (participant) fetchTimeline(participant, n); };
+  const selectNone = () => { setSelectedGenera([]); setTlData(null); };
+
+  // ── Loading ───────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', height: '100%', overflow: 'auto', backgroundColor: '#f5f7fa' }}>
+        <h1 style={{ marginBottom: '6px', color: '#2d3436' }}>Microbiome Analysis</h1>
+        {error
+          ? <div style={{ padding: '10px 14px', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.88rem' }}>{error}</div>
+          : <div style={{ ...CARD, textAlign: 'center', padding: '60px 40px' }}><div style={{ color: '#636e72' }}>Loading dataset…</div></div>
+        }
+      </div>
+    );
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="microbiome-page" style={{ padding: '20px', height: '100%', overflow: 'auto', backgroundColor: '#f5f7fa' }}>
-      <h1 style={{ marginBottom: '20px', color: '#2d3436' }}>🦠 Microbiome Signals</h1>
-      
-      {/* Mode Selector */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '10px', 
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-      }}>
-        {['dashboard', 'samples', 'composition', 'diversity', 'patient', 'analyze'].map(mode => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: viewMode === mode ? '#4ecdc4' : '#fff',
-              color: viewMode === mode ? 'white' : '#333',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              boxShadow: viewMode === mode ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-            }}
-          >
-            {mode === 'dashboard' && '📊 Dashboard'}
-            {mode === 'samples' && '🧬 Samples'}
-            {mode === 'composition' && '🦠 Composition'}
-            {mode === 'diversity' && '📈 Diversity'}
-            {mode === 'patient' && '👤 Patient Profile'}
-            {mode === 'analyze' && '🔬 Analyze'}
-          </button>
-        ))}
+    <div style={{ padding: '20px', height: '100%', overflow: 'auto', backgroundColor: '#f5f7fa' }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: '16px' }}>
+        <h1 style={{ margin: 0, color: '#2d3436' }}>Microbiome Analysis</h1>
+        <p style={{ color: '#636e72', margin: '4px 0 0', fontSize: '0.85rem' }}>
+          iHMP longitudinal dataset — {summary.n_participants} subjects · {summary.n_samples} visits · {summary.n_genera} genera
+        </p>
       </div>
 
-      {/* Error Display */}
       {error && (
-        <div style={{ padding: '15px', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '4px', marginBottom: '20px' }}>
+        <div style={{ padding: '10px 14px', backgroundColor: '#fff3e0', color: '#bf360c',
+          borderRadius: '4px', marginBottom: '16px', fontSize: '0.88rem' }}>
           {error}
         </div>
       )}
 
-      {/* Loading */}
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '24px' }}>⏳ Loading microbiome data...</div>
-        </div>
-      )}
+      {/* Stat chips */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Subjects',  value: summary.n_participants },
+          { label: 'Visits',    value: summary.n_samples },
+          { label: 'Genera',    value: summary.n_genera },
+        ].map(({ label, value }) => (
+          <div key={label} style={{
+            ...CARD, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '12px 24px', minWidth: '90px',
+          }}>
+            <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#4ecdc4' }}>{value ?? '—'}</span>
+            <span style={{ fontSize: '0.75rem', color: '#636e72' }}>{label}</span>
+          </div>
+        ))}
+      </div>
 
-      {/* DASHBOARD VIEW */}
-      {viewMode === 'dashboard' && !loading && summary && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '20px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <div style={{ fontSize: '2rem', color: '#4ecdc4' }}>🧬</div>
-            <div style={{ fontSize: '0.9rem', color: '#666' }}>Total Samples</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{summary.total_samples}</div>
-          </div>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <div style={{ fontSize: '2rem', color: '#45b7d1' }}>👥</div>
-            <div style={{ fontSize: '0.9rem', color: '#666' }}>Subjects</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{summary.total_subjects}</div>
-          </div>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <div style={{ fontSize: '2rem', color: '#96ceb4' }}>🦠</div>
-            <div style={{ fontSize: '0.9rem', color: '#666' }}>Bacterial Taxa</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{summary.bacterial_taxa}</div>
-          </div>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <div style={{ fontSize: '2rem', color: '#ff6b6b' }}>🏥</div>
-            <div style={{ fontSize: '0.9rem', color: '#666' }}>Diseases</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{Object.keys(diseases).length}</div>
-          </div>
-        </div>
-      )}
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'timeline', label: 'Timeline' },
+          { id: 'profile',  label: 'Patient Profile' },
+        ].map(t => (
+          <button key={t.id} onClick={() => handleTabChange(t.id)} style={{
+            padding: '9px 20px',
+            backgroundColor: tab === t.id ? '#4ecdc4' : '#fff',
+            color: tab === t.id ? 'white' : '#333',
+            border: '1px solid #ddd', borderRadius: '4px',
+            cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem',
+          }}>{t.label}</button>
+        ))}
+      </div>
 
-      {viewMode === 'dashboard' && !loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Disease Distribution */}
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🏥 Disease Distribution</h3>
-            <div style={{ height: '300px' }}>
+      {/* ── OVERVIEW ──────────────────────────────────────────────────────────── */}
+      {tab === 'overview' && (
+        <div style={CARD}>
+          <h3 style={{ marginBottom: '4px' }}>Mean Taxonomic Composition</h3>
+          <p style={{ fontSize: '0.8rem', color: '#636e72', marginBottom: '14px' }}>
+            Average relative abundance per genus across all visits
+          </p>
+          {compBarData.length > 0 ? (
+            <div style={{ height: `${Math.max(300, compBarData.length * 26)}px` }}>
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={diseaseDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {diseaseDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Top Bacteria */}
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🦠 Top Bacterial Genera</h3>
-            <div style={{ height: '300px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topComposition} layout="vertical">
+                <BarChart data={compBarData} layout="vertical" margin={{ left: 10, right: 34 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 0.2]} />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#4ecdc4" name="Abundance">
-                    {topComposition.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                  <XAxis type="number" unit="%" />
+                  <YAxis dataKey="genus" type="category" width={125} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={v => [`${v}%`, 'Mean abundance']} />
+                  <Bar dataKey="abundance">
+                    {compBarData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-
-          {/* Diversity Metrics */}
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>📊 Diversity Metrics</h3>
-            <div style={{ height: '300px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={diversity.slice(0, 10)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="sample_id" tick={{ fontSize: 10 }} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="shannon_index" fill="#4ecdc4" name="Shannon Index" />
-                  <Bar dataKey="simpson_index" fill="#45b7d1" name="Simpson Index" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Disease Profiles */}
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🔬 Disease Profiles</h3>
-            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {Object.entries(diseases).map(([disease, profile], index) => (
-                <div key={disease} style={{ padding: '10px', marginBottom: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                  <div style={{ fontWeight: 'bold', color: colors[index % colors.length] }}>{disease}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{profile.description}</div>
-                  <div style={{ fontSize: '0.75rem', marginTop: '5px' }}>
-                    <span style={{ color: '#27ae60' }}>↓ {profile.decreased?.join(', ')}</span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem' }}>
-                    <span style={{ color: '#e74c3c' }}>↑ {profile.increased?.join(', ')}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#b2bec3', padding: '30px' }}>No composition data.</div>
+          )}
         </div>
       )}
 
-      {/* SAMPLES VIEW */}
-      {viewMode === 'samples' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🧬 Sample List</h3>
-            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-              {samples.slice(0, 50).map((sample, index) => (
-                <div
-                  key={sample.sample_id || index}
-                  onClick={() => handleSelectSample(sample)}
-                  style={{
-                    padding: '12px',
-                    marginBottom: '8px',
-                    backgroundColor: selectedSample?.sample_id === sample.sample_id ? '#e8f5e9' : '#f5f5f5',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    border: selectedSample?.sample_id === sample.sample_id ? '2px solid #4ecdc4' : '2px solid transparent'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{sample.sample_id}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                    {sample.disease_status} | Age: {sample.age} | BMI: {sample.bmi?.toFixed(1)}
-                  </div>
+      {/* ── TIMELINE ──────────────────────────────────────────────────────────── */}
+      {tab === 'timeline' && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <div style={CARD}>
+            {/* Participant selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '14px' }}>
+              <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Participant:</label>
+              <select
+                value={participant}
+                onChange={e => handleParticipantChange(e.target.value)}
+                style={{ padding: '7px 12px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '0.9rem' }}
+              >
+                {participants.map(id => <option key={id} value={id}>{id}</option>)}
+              </select>
+              {tlData && (
+                <span style={{ color: '#636e72', fontSize: '0.82rem' }}>
+                  {tlData.n_visits} visit{tlData.n_visits !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            {/* Genus picker */}
+            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#2d3436' }}>
+                  Genera ({selectedGenera.length} / {sortedGenera.length} selected)
+                </span>
+                <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+                  {[{ label: 'Top 5', action: selectTop5 }, { label: 'All', action: selectAll }, { label: 'None', action: selectNone }].map(({ label, action }) => (
+                    <button key={label} onClick={action} style={{
+                      padding: '3px 10px', fontSize: '0.78rem',
+                      border: '1px solid #b2bec3', borderRadius: '4px',
+                      backgroundColor: 'white', cursor: 'pointer', color: '#636e72',
+                    }}>{label}</button>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '6px' }}>
+                {visibleGenera.map((g) => {
+                  const colorIdx = sortedGenera.indexOf(g);
+                  const active   = selectedGenera.includes(g);
+                  const abund    = composition.find(c => c.genus === g);
+                  const pct      = abund ? (abund.mean_abundance * 100).toFixed(2) : null;
+                  return (
+                    <button key={g} onClick={() => toggleGenus(g)} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '5px 10px', borderRadius: '6px',
+                      border: `2px solid ${COLORS[colorIdx % COLORS.length]}`,
+                      backgroundColor: active ? COLORS[colorIdx % COLORS.length] : 'white',
+                      color: active ? 'white' : '#2d3436',
+                      fontSize: '0.80rem', cursor: 'pointer',
+                      fontWeight: active ? 'bold' : 'normal',
+                      transition: 'background-color 0.12s', textAlign: 'left',
+                    }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g}</span>
+                      {pct !== null && (
+                        <span style={{ marginLeft: '6px', fontSize: '0.70rem', opacity: active ? 0.85 : 0.55, flexShrink: 0 }}>
+                          {pct}%
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {sortedGenera.length > COLLAPSED_COUNT && (
+                <button onClick={() => setPickerExpanded(x => !x)} style={{
+                  marginTop: '8px', padding: '4px 12px', fontSize: '0.78rem',
+                  border: '1px solid #dfe6e9', borderRadius: '4px',
+                  backgroundColor: '#f5f7fa', cursor: 'pointer', color: '#636e72',
+                }}>
+                  {pickerExpanded ? 'Show fewer' : `Show ${sortedGenera.length - COLLAPSED_COUNT} more…`}
+                </button>
+              )}
             </div>
           </div>
 
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>📋 Sample Details & Analysis</h3>
-            {selectedSample ? (
-              <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Sample ID:</td>
-                      <td style={{ padding: '10px' }}>{selectedSample.sample_id}</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Subject ID:</td>
-                      <td style={{ padding: '10px' }}>{selectedSample.subject_id}</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Disease Status:</td>
-                      <td style={{ padding: '10px' }}>{selectedSample.disease_status}</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>Age:</td>
-                      <td style={{ padding: '10px' }}>{selectedSample.age}</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>BMI:</td>
-                      <td style={{ padding: '10px' }}>{selectedSample.bmi?.toFixed(1)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+          {tlLoading && <div style={{ textAlign: 'center', color: '#636e72', padding: '30px' }}>Loading…</div>}
 
-                {patientProfile && (
-                  <div>
-                    <h4 style={{ color: '#4ecdc4' }}>Patient Profile Estimation</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '15px' }}>
-                      <div style={{ padding: '10px', backgroundColor: '#e8f5e9', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#666' }}>Age Group</div>
-                        <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.age_group}</div>
-                      </div>
-                      <div style={{ padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#666' }}>BMI Category</div>
-                        <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.bmi_category}</div>
-                      </div>
-                      <div style={{ padding: '10px', backgroundColor: '#fff3e0', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#666' }}>Gut Health Score</div>
-                        <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.gut_health_score}%</div>
-                      </div>
-                      <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#666' }}>Microbial Diversity</div>
-                        <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.microbial_diversity}</div>
-                      </div>
-                    </div>
-
-                    <h4 style={{ color: '#ff6b6b' }}>Disease Risk Assessment</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                      {Object.entries(patientProfile.disease_risks?.diseases || {}).map(([disease, risk]) => (
-                        <div key={disease} style={{ 
-                          padding: '10px', 
-                          backgroundColor: risk.risk_level === 'High' ? '#ffebee' : risk.risk_level === 'Moderate' ? '#fff3e0' : '#e8f5e9',
-                          borderRadius: '4px',
-                          borderLeft: `3px solid ${risk.risk_level === 'High' ? '#e74c3c' : risk.risk_level === 'Moderate' ? '#f39c12' : '#27ae60'}`
-                        }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{disease}</div>
-                          <div style={{ fontSize: '0.8rem', color: risk.risk_level === 'High' ? '#e74c3c' : risk.risk_level === 'Moderate' ? '#f39c12' : '#27ae60' }}>
-                            {risk.risk_level} Risk
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+          {!tlLoading && timelineChart.length > 0 && (
+            <>
+              <div style={CARD}>
+                <h3 style={{ marginBottom: '4px' }}>Relative Abundance per Visit</h3>
+                <p style={{ fontSize: '0.8rem', color: '#636e72', marginBottom: '14px' }}>
+                  Abundance (%) of selected genera across visits
+                </p>
+                {tlData?.trends?.shannon_delta != null && (
+                  <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#636e72' }}>
+                      Shannon Δ: <strong style={{ color: tlData.trends.shannon_delta >= 0 ? '#27ae60' : '#e74c3c' }}>
+                        {tlData.trends.shannon_delta > 0 ? '+' : ''}{tlData.trends.shannon_delta}
+                      </strong>
+                    </span>
+                    {tlData.trends.fb_delta != null && (
+                      <span style={{ fontSize: '0.82rem', color: '#636e72' }}>
+                        F/B Δ: <strong style={{ color: tlData.trends.fb_delta <= 0 ? '#27ae60' : '#e74c3c' }}>
+                          {tlData.trends.fb_delta > 0 ? '+' : ''}{tlData.trends.fb_delta}
+                        </strong>
+                      </span>
+                    )}
                   </div>
                 )}
-              </div>
-            ) : (
-              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
-                Select a sample from the list to view details
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* COMPOSITION VIEW */}
-      {viewMode === 'composition' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🦠 Bacterial Composition (Pie)</h3>
-            <div style={{ height: '400px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={topComposition}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-                    outerRadius={150}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {topComposition.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>📊 Bacterial Composition (Bar)</h3>
-            <div style={{ height: '400px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topComposition}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#4ecdc4" name="Relative Abundance">
-                    {topComposition.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div style={{ gridColumn: '1 / -1', padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🔬 Phylogenetic Taxonomy</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              <div>
-                <h4 style={{ color: '#4ecdc4' }}>Bacterial Phyla</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                  {taxa.phyla.map((phylum, index) => (
-                    <span key={phylum} style={{ padding: '5px 10px', backgroundColor: colors[index % colors.length] + '20', borderRadius: '4px', fontSize: '0.85rem' }}>
-                      {phylum}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h4 style={{ color: '#45b7d1' }}>Bacterial Genera</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                  {taxa.genera.map((genus, index) => (
-                    <span key={genus} style={{ padding: '5px 10px', backgroundColor: colors[index % colors.length] + '20', borderRadius: '4px', fontSize: '0.85rem' }}>
-                      {genus}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DIVERSITY VIEW */}
-      {viewMode === 'diversity' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>📈 Shannon Diversity Index</h3>
-            <div style={{ height: '400px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={diversity.slice(0, 30)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="sample_id" tick={{ fontSize: 10 }} />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="shannon_index" stroke="#4ecdc4" strokeWidth={2} name="Shannon Index" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>📊 Simpson Diversity Index</h3>
-            <div style={{ height: '400px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={diversity.slice(0, 30)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="sample_id" tick={{ fontSize: 10 }} />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="simpson_index" stroke="#45b7d1" strokeWidth={2} name="Simpson Index" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div style={{ gridColumn: '1 / -1', padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🔢 Diversity Metrics Summary</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f5f5f5' }}>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Metric</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Description</th>
-                  <th style={{ padding: '10px', textAlign: 'right' }}>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px' }}>Shannon Index</td>
-                  <td style={{ padding: '10px', color: '#666' }}>Measures species diversity (higher = more diverse)</td>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>
-                    {(diversity.reduce((sum, d) => sum + (d.shannon_index || 0), 0) / (diversity.length || 1)).toFixed(3)}
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px' }}>Simpson Index</td>
-                  <td style={{ padding: '10px', color: '#666' }}>Measures dominance (higher = more diverse)</td>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>
-                    {(diversity.reduce((sum, d) => sum + (d.simpson_index || 0), 0) / (diversity.length || 1)).toFixed(3)}
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px' }}>Chao1</td>
-                  <td style={{ padding: '10px', color: '#666' }}>Estimated species richness</td>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>
-                    {(diversity.reduce((sum, d) => sum + (d.chao1 || 0), 0) / (diversity.length || 1)).toFixed(1)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* PATIENT PROFILE VIEW */}
-      {viewMode === 'patient' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>👤 Patient Profile</h3>
-            {patientProfile ? (
-              <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                  <div style={{ padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '2rem' }}>🎂</div>
-                    <div style={{ fontSize: '0.8rem', color: '#666' }}>Age Group</div>
-                    <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.age_group}</div>
-                  </div>
-                  <div style={{ padding: '15px', backgroundColor: '#e3f2fd', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '2rem' }}>⚖️</div>
-                    <div style={{ fontSize: '0.8rem', color: '#666' }}>BMI Category</div>
-                    <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.bmi_category}</div>
-                  </div>
-                  <div style={{ padding: '15px', backgroundColor: '#fff3e0', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '2rem' }}>❤️</div>
-                    <div style={{ fontSize: '0.8rem', color: '#666' }}>Gut Health</div>
-                    <div style={{ fontWeight: 'bold', color: '#4ecdc4' }}>{patientProfile.patient_profile?.gut_health_score}%</div>
-                  </div>
-                  <div style={{ padding: '15px', backgroundColor: '#f3e5f5', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '2rem' }}>🔬</div>
-                    <div style={{ fontSize: '0.8rem', color: '#666' }}>Diversity</div>
-                    <div style={{ fontWeight: 'bold' }}>{patientProfile.patient_profile?.microbial_diversity}</div>
-                  </div>
-                </div>
-
-                <h4 style={{ color: '#ff6b6b' }}>Disease Risk Radar</h4>
-                <div style={{ height: '300px' }}>
+                <div style={{ height: '320px' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={Object.entries(patientProfile.disease_risks?.diseases || {}).map(([name, data]) => ({
-                      disease: name,
-                      score: data.score * 25,
-                      fullMark: 100
-                    }))}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="disease" />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                      <Radar name="Risk Score" dataKey="score" stroke="#4ecdc4" fill="#4ecdc4" fillOpacity={0.3} />
-                    </RadarChart>
+                    <LineChart data={timelineChart} margin={{ right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis unit="%" domain={[0, 'auto']} />
+                      <Tooltip formatter={(v, name) => [`${v}%`, name]} />
+                      <Legend />
+                      {selectedGenera.map((g, i) => (
+                        <Line key={g} type="monotone" dataKey={g}
+                          stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={{ r: 3 }} />
+                      ))}
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-            ) : (
-              <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                Go to Analyze tab to create a patient profile
-              </p>
-            )}
-          </div>
 
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>💊 Recommendations</h3>
-            {patientProfile?.recommendations ? (
-              <ul style={{ paddingLeft: '20px' }}>
-                {patientProfile.recommendations.map((rec, index) => (
-                  <li key={index} style={{ marginBottom: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                    {rec}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                No recommendations available
-              </p>
-            )}
-          </div>
+              <div style={CARD}>
+                <h3 style={{ marginBottom: '4px' }}>Alpha Diversity — Shannon H'</h3>
+                <p style={{ fontSize: '0.8rem', color: '#636e72', marginBottom: '14px' }}>
+                  Higher H' = more even distribution across genera
+                </p>
+                <div style={{ height: '220px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={timelineChart} margin={{ right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis domain={['auto', 'auto']} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="shannon" stroke="#a29bfe"
+                        strokeWidth={2} dot={{ r: 3 }} name="Shannon H'" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!tlLoading && !timelineChart.length && participant && (
+            <div style={{ ...CARD, textAlign: 'center', color: '#b2bec3', padding: '40px' }}>
+              No visits found for {participant}. Select genera above.
+            </div>
+          )}
         </div>
       )}
 
-      {/* ANALYZE VIEW */}
-      {viewMode === 'analyze' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>🔬 Enter Microbiome Profile</h3>
-            <p style={{ color: '#666', marginBottom: '20px' }}>Adjust bacterial relative abundances (must sum to ~1)</p>
-            
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {Object.entries(customSample).map(([bacteria, value]) => (
-                <div key={bacteria} style={{ marginBottom: '15px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <label style={{ fontWeight: 'bold' }}>{bacteria}</label>
-                    <span>{value.toFixed(3)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="0.5"
-                    step="0.001"
-                    value={value}
-                    onChange={(e) => setCustomSample({...customSample, [bacteria]: parseFloat(e.target.value)})}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-              <button
-                onClick={handleAnalyzeCustom}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: loading ? '#ccc' : '#4ecdc4',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                {loading ? 'Analyzing...' : '🔍 Analyze'}
-              </button>
-              <button
-                onClick={handleEstimatePatient}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: loading ? '#ccc' : '#45b7d1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                {loading ? 'Processing...' : '👤 Get Patient Profile'}
-              </button>
-            </div>
+      {/* ── PROFILE ───────────────────────────────────────────────────────────── */}
+      {tab === 'profile' && (
+        <div>
+          <div style={{ ...CARD, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Participant:</label>
+            <select
+              value={profParticipant}
+              onChange={e => handleProfParticipantChange(e.target.value)}
+              style={{ padding: '7px 12px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '0.9rem' }}
+            >
+              <option value="">— select —</option>
+              {participants.map(id => <option key={id} value={id}>{id}</option>)}
+            </select>
+            {profLoading && <span style={{ color: '#636e72', fontSize: '0.85rem' }}>Loading…</span>}
+            {!profLoading && profile && (
+              <span style={{
+                padding: '4px 12px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: 'bold',
+                backgroundColor: DX_COLOR[profile.diagnosis] || '#dfe6e9', color: 'white',
+              }}>
+                {profile.diagnosis || 'Unknown'}
+              </span>
+            )}
           </div>
 
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>📊 Analysis Results</h3>
-            {analysisResult ? (
-              <div>
-                <h4 style={{ color: '#4ecdc4' }}>Bacterial Profile</h4>
-                <div style={{ marginBottom: '20px' }}>
-                  {analysisResult.bacterial_profile?.top_genera?.slice(0, 5).map((item, index) => (
-                    <div key={index} style={{ padding: '8px', marginBottom: '5px', backgroundColor: '#f5f5f5', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{item.genus}</span>
-                      <span style={{ fontWeight: 'bold' }}>{(item.abundance * 100).toFixed(1)}%</span>
+          {!profLoading && profile && (
+            <div style={CARD}>
+              <h3 style={{ marginBottom: '4px' }}>Gut Health Indicators</h3>
+              <p style={{ fontSize: '0.78rem', color: '#636e72', marginBottom: '16px' }}>
+                Formula-based estimates from latest visit — {profile.participant_id}
+              </p>
+
+              {/* Gut health score bar */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 'bold' }}>Gut Health Score</span>
+                  <span style={{ fontWeight: 'bold', color:
+                    profile.gut_health_label === 'Good' ? '#27ae60'
+                    : profile.gut_health_label === 'Moderate' ? '#f39c12' : '#e74c3c' }}>
+                    {profile.gut_health_score} / 100 — {profile.gut_health_label}
+                  </span>
+                </div>
+                <div style={{ background: '#eee', borderRadius: '4px', height: '8px' }}>
+                  <div style={{
+                    width: `${profile.gut_health_score}%`,
+                    background: profile.gut_health_label === 'Good' ? '#27ae60'
+                      : profile.gut_health_label === 'Moderate' ? '#f39c12' : '#e74c3c',
+                    height: '8px', borderRadius: '4px', transition: 'width 0.4s',
+                  }} />
+                </div>
+              </div>
+
+              {/* Top genera */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#636e72', marginBottom: '8px', fontWeight: 'bold' }}>
+                  Top genera (latest visit)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '4px' }}>
+                  {(profile.top_genera || []).map(({ genus, abundance_pct }, i) => (
+                    <div key={genus} style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      padding: '5px 10px', backgroundColor: '#f7f9fc', borderRadius: '4px', fontSize: '0.83rem',
+                    }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '10px', height: '10px', borderRadius: '50%',
+                          backgroundColor: COLORS[i % COLORS.length], display: 'inline-block' }} />
+                        {genus}
+                      </span>
+                      <span style={{ fontWeight: 'bold' }}>{abundance_pct}%</span>
                     </div>
                   ))}
                 </div>
-
-                <h4 style={{ color: '#ff6b6b' }}>Disease Risks</h4>
-                {Object.entries(analysisResult.disease_risks?.diseases || {}).map(([disease, risk]) => (
-                  <div key={disease} style={{ 
-                    padding: '10px', 
-                    marginBottom: '10px', 
-                    backgroundColor: risk.risk_level === 'High' ? '#ffebee' : risk.risk_level === 'Moderate' ? '#fff3e0' : '#e8f5e9',
-                    borderRadius: '4px',
-                    borderLeft: `4px solid ${risk.risk_level === 'High' ? '#e74c3c' : risk.risk_level === 'Moderate' ? '#f39c12' : '#27ae60'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                      <span>{disease}</span>
-                      <span style={{ color: risk.risk_level === 'High' ? '#e74c3c' : risk.risk_level === 'Moderate' ? '#f39c12' : '#27ae60' }}>
-                        {risk.risk_level}
-                      </span>
-                    </div>
-                    {risk.details?.length > 0 && (
-                      <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
-                        {risk.details.join(', ')}
-                      </div>
-                    )}
-                  </div>
-                ))}
               </div>
-            ) : (
-              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
-                Enter microbiome profile and click Analyze to see results
-              </p>
-            )}
-          </div>
+
+              <MetricRow label="Shannon Diversity (H')" value={profile.shannon_diversity}
+                info="Higher = greater species evenness" />
+              <MetricRow label="Dominant Genus"         value={profile.dominant_genus} />
+              <MetricRow label="Beneficial Bacteria"    value={profile.beneficial_pct} unit="%"
+                info="Faecalibacterium + Akkermansia + Bifidobacterium + Roseburia" />
+              <MetricRow label="F/B Ratio"              value={profile.fb_ratio}
+                info="Firmicutes / Bacteroidetes proxy (Ley et al. 2006)" />
+              <MetricRow label="B/P Ratio"              value={profile.bp_ratio}
+                info="Bacteroides / Prevotella — dietary pattern (Wu et al. 2011)" />
+              <MetricRow label="Inflammation Index"     value={profile.inflammation_index}
+                info="Pro / anti-inflammatory genera ratio" />
+              <MetricRow label="Dysbiosis Index"        value={profile.dysbiosis_index}
+                info="Escherichia / (Faecalibacterium + Akkermansia)" />
+
+              <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ padding: '10px 12px', backgroundColor: '#e8f8f7', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#636e72' }}>Enterotype</div>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginTop: '3px' }}>{profile.enterotype}</div>
+                </div>
+                <div style={{ padding: '10px 12px', backgroundColor: '#f0fafa', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#636e72' }}>Age Pattern</div>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginTop: '3px' }}>{profile.age_pattern}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!profLoading && !profile && (
+            <div style={{ ...CARD, textAlign: 'center', color: '#b2bec3', padding: '40px' }}>
+              Select a participant above to view their profile.
+            </div>
+          )}
         </div>
       )}
     </div>

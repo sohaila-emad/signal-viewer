@@ -261,7 +261,7 @@ const FileUploader = forwardRef(({ onDataLoaded, signalType }, ref) => {
         {signalType === 'eeg' && 'NPY (+sfreq.npy), EDF, CSV, WFDB (.hea+.dat)'}
         {signalType === 'acoustic' && 'WAV, MP3'}
         {signalType === 'stock' && 'CSV, XLSX'}
-        {signalType === 'microbiome' && 'TSV, BIOM, FASTA'}
+        {signalType === 'microbiome' && 'TSV, CSV, BIOM'}
         {!['medical','eeg','acoustic','stock','microbiome'].includes(signalType) && 'CSV, EDF, MAT, NPY'}
         {' '}| Max: {sizeLimits[signalType]}MB
       </div>

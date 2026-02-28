@@ -6,6 +6,7 @@ import tempfile
 import json
 import struct
 from werkzeug.utils import secure_filename
+from ..services.microbiome_service import get_microbiome_service
 
 # Try to import wfdb for reading WFDB format files
 try:
@@ -22,7 +23,7 @@ ALLOWED_EXTENSIONS = {
     'eeg': {'.edf', '.csv', '.mat', '.npy', '.hea', '.dat'},  # add this
     'acoustic': {'.wav', '.mp3'},
     'stock': {'.csv', '.xlsx'},
-    'microbiome': {'.biom', '.fasta', '.tsv'}
+    'microbiome': {'.biom', '.tsv', '.csv', '.txt'}
 }
 
 def safe_convert_to_list(data):
@@ -371,89 +372,27 @@ def process_stock_file(filepath, filename):
         return {'error': str(e)}
 
 def process_microbiome_file(filepath, filename):
-    """Process microbiome files: .biom, .fasta, .tsv"""
-    ext = os.path.splitext(filename)[1].lower()
-    
+    """
+    Microbiome data is now bundled (ihmp_longitudinal.csv) and auto-loaded.
+    File uploads for this type are no longer needed; return the current summary.
+    """
     try:
-        # TSV files
-        if ext == '.tsv':
-            df = pd.read_csv(filepath, sep='\t')
-            
-            # Assume first column is sample IDs
-            sample_ids = df.iloc[:, 0].astype(str).tolist()
-            
-            # Get numeric columns as features
-            feature_data = []
-            feature_names = []
-            
-            for i, col in enumerate(df.columns):
-                if i > 0 and pd.api.types.is_numeric_dtype(df[col]):
-                    feature_data.append(df[col].values)
-                    feature_names.append(str(col))
-            
-            return {
-                'data': safe_convert_to_list(np.array(feature_data)),
-                'sample_ids': sample_ids,
-                'feature_names': feature_names,
-                'channels': len(feature_data),
-                'samples': len(sample_ids),
-                'filename': filename,
-                'type': 'microbiome'
-            }
-        
-        # BIOM files
-        elif ext == '.biom':
-            import biom
-            table = biom.load_table(filepath)
-            data = table.matrix_data.toarray()
-            sample_ids = table.ids('sample').tolist()
-            obs_ids = table.ids('observation').tolist()
-            
-            return {
-                'data': data.tolist(),
-                'sample_ids': sample_ids,
-                'observation_ids': obs_ids,
-                'channels': data.shape[0],
-                'samples': data.shape[1],
-                'filename': filename,
-                'type': 'microbiome'
-            }
-        
-        # FASTA files
-        elif ext == '.fasta':
-            from Bio import SeqIO
-            sequences = []
-            ids = []
-            
-            for record in SeqIO.parse(filepath, "fasta"):
-                sequences.append(str(record.seq))
-                ids.append(record.id)
-                if len(sequences) >= 100:  # Limit to 100 sequences
-                    break
-            
-            # Create simple features: length and GC content
-            feature_data = []
-            for seq in sequences:
-                length = len(seq)
-                gc_count = seq.count('G') + seq.count('C')
-                gc_content = gc_count / length if length > 0 else 0
-                feature_data.append([length, gc_content])
-            
-            return {
-                'data': safe_convert_to_list(np.array(feature_data).T),
-                'sequence_ids': ids,
-                'feature_names': ['Length', 'GC_Content'],
-                'channels': 2,
-                'samples': len(sequences),
-                'filename': filename,
-                'type': 'microbiome'
-            }
-    
+        summary = get_microbiome_service().get_summary()
+        return {
+            'type':                 'microbiome',
+            'filename':             summary.get('filename', 'ihmp_longitudinal.csv'),
+            'abundance_loaded':     True,
+            'n_samples':            summary.get('n_samples', 0),
+            'n_genera':             summary.get('n_genera', 0),
+            'n_matched':            summary.get('n_matched', 0),
+            'matched_participants': summary.get('matched_participants', []),
+            'data':     [],
+            'channels': 0,
+            'fs':       1,
+        }
     except Exception as e:
-        print(f"Error processing microbiome file: {str(e)}")
+        print(f'Microbiome service error: {e}')
         return {'error': str(e)}
-    
-    return {'error': 'Unsupported file format'}
 
 @upload_bp.route('/upload', methods=['POST'])
 def upload_file():

@@ -93,29 +93,18 @@ export const stockAPI = {
 };
 
 export const microbiomeAPI = {
-  // Sample management
-  getSamples: () => api.get('/microbiome/'),
-  getSample: (sampleId) => api.get(`/microbiome/${sampleId}`),
-  createSample: (data) => api.post('/microbiome/', data),
-  deleteSample: (sampleId) => api.delete(`/microbiome/${sampleId}`),
-  
-  // Analysis
-  analyzeDiversity: (samples) => 
-    api.post('/microbiome/analyze-diversity', { samples }),
-    
-  // NEW ENDPOINTS
-  getSummary: () => api.get('/microbiome/summary'),
-  getDiseases: () => api.get('/microbiome/diseases'),
-  getTaxa: () => api.get('/microbiome/taxa'),
-  analyze: (data) => api.post('/microbiome/analyze', data),
-  estimatePatient: (data) => api.post('/microbiome/estimate-patient', data),
-  getStatistics: () => api.get('/microbiome/statistics'),
-  getDiversity: () => api.get('/microbiome/diversity'),
-  compareSamples: (sample1Id, sample2Id) => 
-    api.post('/microbiome/compare', { sample1_id: sample1Id, sample2_id: sample2Id }),
-  getComposition: () => api.get('/microbiome/composition'),
-  getDiseaseSamples: (diseaseName) => api.get(`/microbiome/disease/${diseaseName}`),
-  loadData: (nSamples) => api.post('/microbiome/load-data', { n_samples: nSamples }),
+  // Check load status (metadata always loaded; abundance after file upload)
+  getSummary:           ()                       => api.get('/microbiome/summary'),
+  // Participants that have data in the current abundance file
+  getParticipants:      ()                       => api.get('/microbiome/participants'),
+  // Mean genus abundances across all samples (for overview bar chart)
+  getComposition:       ()                       => api.get('/microbiome/composition'),
+  // Longitudinal time-series for one participant + selected genera
+  getTimeline:          (participantId, genera)  =>
+    api.post(`/microbiome/participant/${participantId}/timeline`, { genera }),
+  // Real clinical metadata + formula-based gut health profile
+  getParticipantProfile: (participantId)         =>
+    api.get(`/microbiome/participant/${participantId}/profile`),
 };
 export const eegAPI = {
   predict: (signalData) => api.post('/medical/eeg/predict', signalData),
