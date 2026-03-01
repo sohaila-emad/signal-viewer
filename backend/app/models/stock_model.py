@@ -21,7 +21,10 @@ import torch.nn as nn
 from copy import deepcopy as dc
 from typing import Optional
 
-MODELS_DIR = r"D:\Git\bin\signal-viewer\models\saved_models"
+# Resolve models directory relative to this file so the backend works
+# regardless of current working directory or machine.
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+MODELS_DIR = os.path.join(BASE_DIR, "models", "saved_models")
 
 # ── asset catalogue ────────────────────────────────────────────────────────────
 # These are the only assets the app supports.

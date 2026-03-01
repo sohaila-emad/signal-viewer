@@ -1,211 +1,105 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import './LandingPage.css';
 
-const LandingPage = ({ onFileSelected, onSampleClick, signalType, setSignalType }) => {
-  const [dragActive, setDragActive] = useState(false);
-  const [previewPoints, setPreviewPoints] = useState([]);
-
-  // Generate animated ECG preview
-  useEffect(() => {
-    const generatePreview = () => {
-      const points = [];
-      for (let i = 0; i < 100; i++) {
-        const x = i;
-        // Create a realistic ECG pattern with P, Q, R, S, T waves
-        let y = 50;
-        if (i % 25 === 10) y = 30; // P wave
-        if (i % 25 === 15) y = 20; // Q wave
-        if (i % 25 === 16) y = 80; // R wave (peak)
-        if (i % 25 === 17) y = 30; // S wave
-        if (i % 25 === 22) y = 45; // T wave
-        else y = 50 + Math.sin(i * 0.5) * 5;
-        
-        points.push({ x, y });
-      }
-      setPreviewPoints(points);
-    };
-
-    generatePreview();
-    const interval = setInterval(generatePreview, 2000); // Animate every 2 seconds
-    return () => clearInterval(interval);
-  }, []);
-
-  // Handle drag events
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  // Handle drop
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const files = Array.from(e.dataTransfer.files);
-      console.log('Files dropped:', files.map(f => f.name).join(', '));
-      onFileSelected(files);
-    }
-  };
-
-  // Handle file input
-  const handleFileInput = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      console.log(`Files selected: ${files.map(f => f.name).join(', ')}`);
-      // Pass all files as a batch so pairs like .hea+.dat or .npy+sfreq.npy work
-      onFileSelected(files);
-    }
-  };
-
-  // Signal type icons
- const signalTypes = [
-  { id: 'medical', label: 'Medical ECG', icon: '❤️', color: '#ff6b6b' },
-  { id: 'eeg', label: 'EEG', icon: '🧠', color: '#9c27b0' },   // <-- add this
-  { id: 'acoustic', label: 'Acoustic Sounds', icon: '🎵', color: '#4ecdc4' },
-  { id: 'stock', label: 'Stock Market', icon: '📈', color: '#45b7d1' },
-  { id: 'microbiome', label: 'Microbiome', icon: '🦠', color: '#96ceb4' }
+const modules = [
+  {
+    id: 'medical',
+    label: 'ECG Analysis',
+    icon: '❤️',
+    color: '#ff6b6b',
+    desc: 'Upload ECG/medical signals for AI-powered arrhythmia detection and multi-channel visualization.',
+    tag: 'Upload required',
+  },
+  {
+    id: 'eeg',
+    label: 'EEG Analysis',
+    icon: '🧠',
+    color: '#9c27b0',
+    desc: 'Upload EEG recordings for brain-wave classification and continuous/XOR/Polar views.',
+    tag: 'Upload required',
+  },
+  {
+    id: 'acoustic',
+    label: 'Acoustic Signals',
+    icon: '🎵',
+    color: '#4ecdc4',
+    desc: 'Doppler effect simulator, vehicle analysis, and drone detection — no file needed.',
+    tag: 'Ready to use',
+  },
+  {
+    id: 'stock',
+    label: 'Stock Market',
+    icon: '📈',
+    color: '#45b7d1',
+    desc: 'LSTM-based price forecasting for stocks, commodities, and currencies.',
+    tag: 'Ready to use',
+  },
+  {
+    id: 'microbiome',
+    label: 'Microbiome',
+    icon: '🦠',
+    color: '#96ceb4',
+    desc: 'Gut-health profiling, diversity trends, and longitudinal analysis of iHMP data.',
+    tag: 'Ready to use',
+  },
 ];
 
+const LandingPage = ({ onModuleSelect }) => {
   return (
     <div className="landing-page">
-      {/* Animated Background Preview */}
-      <div className="preview-background">
-        <svg className="preview-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path
-            d={`M ${previewPoints.map(p => `${p.x},${p.y}`).join(' L ')}`}
-            stroke="rgba(76, 175, 80, 0.2)"
-            strokeWidth="2"
-            fill="none"
-          />
-        </svg>
-      </div>
+      {/* Decorative blurred circles */}
+      <div className="landing-bg-circle circle-1" />
+      <div className="landing-bg-circle circle-2" />
+      <div className="landing-bg-circle circle-3" />
 
       <div className="landing-content">
         <h1 className="landing-title">
-          <span className="title-wave">📊</span> 
+          <span className="title-wave">📊</span>
           Signal Viewer Pro
-          <span className="title-wave">📈</span>
         </h1>
-        
+
         <p className="landing-subtitle">
-          Upload your signals and let AI analyze them in real-time
+          Explore, visualize, and analyze biomedical, acoustic, financial, and microbiome signals — powered by AI.
         </p>
 
-        {/* Signal Type Selector */}
-        <div className="signal-type-selector">
-          {signalTypes.map(type => (
+        {/* ── Module Cards ── */}
+        <div className="module-grid">
+          {modules.map((m) => (
             <button
-              key={type.id}
-              className={`type-button ${signalType === type.id ? 'active' : ''}`}
-              onClick={() => setSignalType(type.id)}
-              style={{ '--type-color': type.color }}
+              key={m.id}
+              className="module-card"
+              style={{ '--accent': m.color }}
+              onClick={() => onModuleSelect(m.id)}
             >
-              <span className="type-icon">{type.icon}</span>
-              <span className="type-label">{type.label}</span>
+              <span className="module-icon">{m.icon}</span>
+              <h3 className="module-label">{m.label}</h3>
+              <p className="module-desc">{m.desc}</p>
+              <span className="module-tag">{m.tag}</span>
             </button>
           ))}
         </div>
 
-        {/* Drag & Drop Area */}
-        <div
-          className={`upload-area ${dragActive ? 'drag-active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          <input
-            type="file"
-            id="file-input"
-            onChange={handleFileInput}
-            multiple
-            accept=".csv,.txt,.wav,.mp3,.edf,.hea,.dat,.xlsx,.json,.npy"
-            style={{ display: 'none' }}
-          />
-          
-          <div className="upload-content">
-            <div className="upload-icon">📤</div>
-            <h3>Drag & Drop your file here</h3>
-            <p>or</p>
-            <button 
-              className="browse-button"
-              onClick={() => document.getElementById('file-input').click()}
-            >
-              Browse Files
-            </button>
-            <p className="file-hint">
-              {/* Supported formats: CSV, TXT, WAV, MP3, EDF, XLSX, JSON */}
-              {signalType === 'medical' && 'Supported: CSV, EDF, WFDB (.hea + .dat)'}
-              {signalType === 'eeg' && 'Supported: NPY, EDF, CSV'}
-              {signalType === 'acoustic' && 'Supported: WAV, MP3, CSV'}
-              {signalType === 'stock' && 'Supported: CSV, JSON, XLSX'}
-              {signalType === 'microbiome' && 'Supported: CSV, JSON'}
-            </p>
-          </div>
-        </div>
-
-        {/* Features Grid */}
+        {/* ── Highlights ── */}
         <div className="features-grid">
           <div className="feature-card">
             <div className="feature-icon">🔄</div>
             <h4>Multi-Channel Viewer</h4>
             <p>View multiple channels separately or overlaid</p>
           </div>
-          
           <div className="feature-card">
             <div className="feature-icon">🤖</div>
             <h4>AI Detection</h4>
             <p>Automatic abnormality detection using deep learning</p>
           </div>
-          
           <div className="feature-card">
             <div className="feature-icon">📊</div>
-            <h4>XOR & Polar Views</h4>
-            <p>Advanced visualization modes for pattern analysis</p>
+            <h4>Advanced Views</h4>
+            <p>XOR, Polar, and Recurrence plots for pattern analysis</p>
           </div>
-          
           <div className="feature-card">
             <div className="feature-icon">⚡</div>
             <h4>Real-time Controls</h4>
             <p>Play, pause, zoom, and pan through your signals</p>
-          </div>
-        </div>
-
-        {/* Sample Data Section */}
-        <div className="sample-section">
-          <h3>Try with sample data</h3>
-          <div className="sample-buttons">
-            <button 
-              className="sample-button"
-              onClick={() => onSampleClick('Normal ECG')}
-            >
-              <span>❤️</span> Normal ECG
-            </button>
-            <button 
-              className="sample-button"
-              onClick={() => onSampleClick('Arrhythmia')}
-            >
-              <span>⚡</span> Arrhythmia
-            </button>
-            <button 
-              className="sample-button"
-              onClick={() => onSampleClick('Car Passing')}
-            >
-              <span>🎵</span> Car Passing
-            </button>
-            <button 
-              className="sample-button"
-              onClick={() => onSampleClick('Stock Data')}
-            >
-              <span>📈</span> Stock Data
-            </button>
           </div>
         </div>
       </div>
