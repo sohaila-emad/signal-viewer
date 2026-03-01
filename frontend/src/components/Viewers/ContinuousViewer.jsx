@@ -234,7 +234,7 @@ const ContinuousViewer = ({ data }) => {
               </ResponsiveContainer>
               <div style={{ textAlign: 'center', marginTop: '15px' }}>
                 <label style={{ fontSize: '13px', color: '#666' }}>Overlap Spread: </label>
-                <input type="range" min="0.5" max="20" step="0.5" value={offsetAmount} onChange={e => setOffsetAmount(parseFloat(e.target.value))} />
+                <input type="range" min="0.0" max="20" step="0.5" value={offsetAmount} onChange={e => setOffsetAmount(parseFloat(e.target.value))} />
               </div>
             </div>
           ) : (
