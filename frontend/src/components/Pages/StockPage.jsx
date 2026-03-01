@@ -98,7 +98,7 @@ const StockPage = () => {
   // ── build recharts data arrays ─────────────────────────────────────────────
 
   const buildGraph1Data = () => {
-    if (!graph1) return [];
+    if (!graph1 || !graph1.graph1_available) return [];
 
     const trainLen = graph1.train_dates.length;
     const testLen  = graph1.test_dates.length;
@@ -249,8 +249,10 @@ const StockPage = () => {
         </div>
       )}
 
+      
+
       {/* ── GRAPH 1 — full history ── */}
-      {!loading && graph1 && (
+      {!loading && graph1 && graph1.graph1_available && (
         <div style={{
           backgroundColor: 'white', borderRadius: 8, padding: 24,
           boxShadow: '0 2px 4px rgba(0,0,0,0.08)', marginBottom: 24,
