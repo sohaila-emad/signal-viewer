@@ -17,6 +17,11 @@ def create_app():
             "allow_headers": ["Content-Type", "Authorization"]
         }
     })
+
+    @app.after_request
+    def add_cors_on_errors(response):
+        response.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
+        return response
     
     # Register blueprints
     from .routes.medical_routes import medical_bp
