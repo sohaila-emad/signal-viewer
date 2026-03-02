@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import os
@@ -10,17 +10,18 @@ def create_app():
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
     app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
     
-    CORS(app, resources={
-        r"/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
+    CORS(app, 
+         resources={r"/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000", "*"]}},
+         allow_headers=["Content-Type", "Authorization", "Accept"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         supports_credentials=True)
 
     @app.after_request
-    def add_cors_on_errors(response):
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
+    def add_cors_headers(response):
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "http://localhost:3000")
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, X-Requested-With"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
     
     # Register blueprints
