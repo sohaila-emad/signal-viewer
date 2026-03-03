@@ -166,15 +166,15 @@ def analyze_vehicle_passing():
 
 
 @acoustic_bp.route('/vehicle/detect', methods=['POST'])
-def detect_drone_submarine():
+def detect_drone():
     """
-    Detect drone or submarine sounds in audio.
-    
+    Detect drone sounds in audio.
+
     Request body:
     {
         "audio_data": list,      # List of audio samples
         "sample_rate": int,       # Sample rate in Hz (default: 44100)
-        "vehicle_type": string   # 'auto', 'drone', or 'submarine' (default: 'auto')
+        "vehicle_type": string   # 'auto' or 'drone' (default: 'auto')
     }
     """
     data = request.get_json()

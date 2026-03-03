@@ -23,7 +23,7 @@ const modules = [
     label: 'Acoustic Signals',
     icon: '🎵',
     color: '#4ecdc4',
-    desc: 'Doppler effect simulator, vehicle analysis, and drone detection — no file needed.',
+    desc: 'Doppler effect simulator, vehicle analysis, and drone detection.',
     tag: 'Ready to use',
   },
   {

@@ -154,7 +154,7 @@ def calculate_trends(longitudinal: List[Dict]) -> Dict:
 
     def _delta(series, key):
         vals = [p[key] for p in series if p[key] is not None]
-        return round(vals[-1] - vals[0], 4) if len(vals) >= 2 else None
+        return round(vals[-1] - vals[-2], 4) if len(vals) >= 2 else None
 
     return {
         'shannon_trend': shannon_series,
@@ -209,21 +209,8 @@ def estimate_patient_profile(abundances: Dict[str, float]) -> Dict:
     else:
         enterotype = 'ET-3 (Ruminococcus/mixed) — Diverse diet'
 
-    if akkermansia < 0.01 and (fb_ratio or 0) > 2.5:
-        bmi_tendency = 'Overweight tendency (↓ Akkermansia + ↑ F/B ratio)'
-    elif akkermansia >= 0.03 and (fb_ratio or 999) < 1.5:
-        bmi_tendency = 'Normal weight tendency (healthy Akkermansia, balanced F/B)'
-    else:
-        bmi_tendency = 'Inconclusive'
 
-    if bifidobacterium > 0.15:
-        age_pattern = 'Infant / early childhood (↑ Bifidobacterium)'
-    elif H > 3.0 and beneficial > 0.20:
-        age_pattern = 'Young adult (high diversity + abundant beneficial genera)'
-    elif H > 2.0:
-        age_pattern = 'Adult (moderate diversity)'
-    else:
-        age_pattern = 'Elderly or dysbiotic pattern (↓ diversity)'
+
 
     return {
         'shannon_diversity':  round(H, 4),
@@ -235,7 +222,5 @@ def estimate_patient_profile(abundances: Dict[str, float]) -> Dict:
         'beneficial_pct':     round(beneficial * 100, 2),
         'inflammation_index': inflammation_index,
         'dysbiosis_index':    dysbiosis_index,
-        'bmi_tendency':       bmi_tendency,
-        'age_pattern':        age_pattern,
         'dominant_genus':     max(abundances, key=abundances.get) if abundances else 'Unknown',
     }

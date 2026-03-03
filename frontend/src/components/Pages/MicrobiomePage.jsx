@@ -354,7 +354,7 @@ const MicrobiomePage = () => {
                 <p style={{ fontSize: '0.8rem', color: '#636e72', marginBottom: '14px' }}>
                   Abundance (%) of selected genera across visits
                 </p>
-                {tlData?.trends?.shannon_delta != null && (
+                {/* {tlData?.trends?.shannon_delta != null && (
                   <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.82rem', color: '#636e72' }}>
                       Shannon Δ: <strong style={{ color: tlData.trends.shannon_delta >= 0 ? '#27ae60' : '#e74c3c' }}>
@@ -369,7 +369,7 @@ const MicrobiomePage = () => {
                       </span>
                     )}
                   </div>
-                )}
+                )} */}
                 <div style={{ height: '320px' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={timelineChart} margin={{ right: 20 }}>
@@ -430,14 +430,6 @@ const MicrobiomePage = () => {
               {participants.map(id => <option key={id} value={id}>{id}</option>)}
             </select>
             {profLoading && <span style={{ color: '#636e72', fontSize: '0.85rem' }}>Loading…</span>}
-            {!profLoading && profile && (
-              <span style={{
-                padding: '4px 12px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: 'bold',
-                backgroundColor: DX_COLOR[profile.diagnosis] || '#dfe6e9', color: 'white',
-              }}>
-                {profile.diagnosis || 'Unknown'}
-              </span>
-            )}
           </div>
 
           {!profLoading && profile && (
@@ -495,22 +487,18 @@ const MicrobiomePage = () => {
               <MetricRow label="Beneficial Bacteria"    value={profile.beneficial_pct} unit="%"
                 info="Faecalibacterium + Akkermansia + Bifidobacterium + Roseburia" />
               <MetricRow label="F/B Ratio"              value={profile.fb_ratio}
-                info="Firmicutes / Bacteroidetes proxy (Ley et al. 2006)" />
+                info="Firmicutes / Bacteroidetes proxy" />
               <MetricRow label="B/P Ratio"              value={profile.bp_ratio}
-                info="Bacteroides / Prevotella — dietary pattern (Wu et al. 2011)" />
+                info="Bacteroides / Prevotella — dietary pattern" />
               <MetricRow label="Inflammation Index"     value={profile.inflammation_index}
                 info="Pro / anti-inflammatory genera ratio" />
               <MetricRow label="Dysbiosis Index"        value={profile.dysbiosis_index}
                 info="Escherichia / (Faecalibacterium + Akkermansia)" />
 
-              <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ marginTop: '14px' }}>
                 <div style={{ padding: '10px 12px', backgroundColor: '#e8f8f7', borderRadius: '6px' }}>
                   <div style={{ fontSize: '0.75rem', color: '#636e72' }}>Enterotype</div>
                   <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginTop: '3px' }}>{profile.enterotype}</div>
-                </div>
-                <div style={{ padding: '10px 12px', backgroundColor: '#f0fafa', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#636e72' }}>Age Pattern</div>
-                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginTop: '3px' }}>{profile.age_pattern}</div>
                 </div>
               </div>
             </div>

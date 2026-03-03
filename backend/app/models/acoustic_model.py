@@ -2,7 +2,7 @@
 Acoustic Models for Signal Processing
 - Doppler effect simulation for vehicle passing
 - Vehicle sound analysis
-- Drone/Submarine detection
+- Drone detection
 """
 import os
 import numpy as np
@@ -281,7 +281,6 @@ class DroneDetector:
         return {
             'detection':       detection,
             'drone_score':     round(prob, 3),
-            'submarine_score': 0.0,
             'confidence':      round(prob if detection == "drone" else 1 - prob, 3),
         }
 
@@ -335,9 +334,9 @@ def analyze_vehicle_sound(audio_data: list, sample_rate: int = 44100) -> dict:
     return analyzer.estimate_vehicle_parameters(audio_array, sample_rate)
 
 
-def detect_drone_submarine(audio_data: list, sample_rate: int = 44100) -> dict:
+def detect_drone(audio_data: list, sample_rate: int = 44100) -> dict:
     """
-    Detect drone or submarine sounds in audio.
+    Detect drone sounds in audio.
     
     Args:
         audio_data: List of audio samples

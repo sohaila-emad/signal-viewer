@@ -102,21 +102,7 @@ const PolarViewer = ({ data }) => {
     }));
   }, [polarData]);
 
-  // 6. STABILITY SCORE LOGIC
-  const stability = useMemo(() => {
-    if (polarData.length < L * 1.5) return 100;
-    const samples = polarData.slice(-Math.floor(L * 2));
-    let varianceSum = 0;
-    const checkAngles = [45, 90, 135, 180, 225, 270];
-    checkAngles.forEach(checkAngle => {
-      const matching = samples.filter(p => Math.abs(p.angle - checkAngle) < 10);
-      if (matching.length > 1) {
-        const mean = matching.reduce((a, b) => a + b.radius, 0) / matching.length;
-        varianceSum += matching.reduce((a, b) => a + Math.pow(b.radius - mean, 2), 0) / matching.length;
-      }
-    });
-    return Math.max(0, Math.min(100, Math.round(100 - (varianceSum * 2))));
-  }, [polarData, L]);
+
 
   // 7. ANIMATION
   useEffect(() => {
@@ -142,17 +128,11 @@ const PolarViewer = ({ data }) => {
           <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
             <span><strong>Sync:</strong> {L.toFixed(1)} samples</span>
             <span><strong>Mode:</strong> {mode.toUpperCase()}</span>
-            <span><strong>Status:</strong> {stability > 75 ? '🟢 Stable' : '🟡 Varied'}</span>
+            {/*<span><strong>Status:</strong> {stability > 75 ? '🟢 Stable' : '🟡 Varied'}</span>*/}
           </div>
         </div>
 
-        <div style={{ width: '220px', background: '#fff', padding: '15px', borderRadius: '12px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#888', marginBottom: '5px' }}>RHYTHM STABILITY</div>
-          <div style={{ fontSize: '2.2rem', fontWeight: 'bold', color: stability > 80 ? '#4CAF50' : '#FF9800' }}>{stability}%</div>
-          <div style={{ height: '6px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ width: `${stability}%`, height: '100%', background: stability > 80 ? '#4CAF50' : '#FF9800', transition: 'width 0.4s' }} />
-          </div>
-        </div>
+
       </div>
 
       {/* 2. CONTROLS BAR */}
@@ -174,7 +154,7 @@ const PolarViewer = ({ data }) => {
           <>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>PERSISTENCE: {timeWindow}</label>
-              <input type="range" min="50" max="1000" value={timeWindow} onChange={e => setTimeWindow(Number(e.target.value))} style={{ width: '100%', marginTop: '5px' }} />
+              <input type="range" min="0.0" max="1000" value={timeWindow} onChange={e => setTimeWindow(Number(e.target.value))} style={{ width: '100%', marginTop: '5px' }} />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button onClick={() => setPlayback(!playback)} style={{ width: '100%', padding: '10px', background: playback ? '#f44336' : '#4CAF50', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>

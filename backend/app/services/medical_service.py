@@ -5,10 +5,6 @@ Provides service layer for medical signal processing (ECG/EEG)
 
 import numpy as np
 from typing import Dict, List, Optional
-from ..models.ecg_model import (
-    predict_ecg,
-    analyze_ecg_classic
-)
 from ..models.model_loader import (
     initialize_models,
     get_ecgnet_model,
@@ -36,12 +32,12 @@ class MedicalService:
         self.use_real_models = self.model_status['ecgnet'] or self.model_status['classical_ml']
         
         if self.use_real_models:
-            print("\n✓ REAL trained models are ACTIVE")
+            print("\n[OK] REAL trained models are ACTIVE")
             print(f"  - ECGNet (Deep Learning): {'LOADED' if self.model_status['ecgnet'] else 'Not available'}")
             print(f"  - Classical ML (Random Forest): {'LOADED' if self.model_status['classical_ml'] else 'Not available'}")
             print(f"  - Device: {self.model_status['device']}")
         else:
-            print("\n⚠ No real models found, using SYNTHETIC predictions")
+            print("\n[WARNING] No real models found - predictions unavailable")
             print(f"  - Models directory: {self.model_status['models_dir']}")
         print("="*60 + "\n")
     
@@ -205,14 +201,8 @@ class MedicalService:
             
         else:
             results['using_real_models'] = False
-            print("⚠ Using SYNTHETIC predictions (real models not available)")
-            
-            # Fallback to synthetic predictions
-            synthetic_ai = predict_ecg(ecg_data, fs)
-            synthetic_classic = analyze_ecg_classic(ecg_data, fs)
-            
-            results['synthetic_ai'] = synthetic_ai
-            results['synthetic_analysis'] = synthetic_classic
+            results['error'] = 'Real ECG models not loaded. Cannot make predictions.'
+            print("[WARNING] Real models not available - predictions cannot be generated")
         
         return results
     

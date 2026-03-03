@@ -23,7 +23,7 @@ try:
     WFDB_AVAILABLE = True
 except ImportError:
     WFDB_AVAILABLE = False
-    print("⚠ wfdb not installed. WFDB file support disabled. Install with: pip install wfdb")
+    print("[WARNING] wfdb not installed. WFDB file support disabled. Install with: pip install wfdb")
 
 # Try to import joblib for classical ML model
 try:
@@ -157,11 +157,11 @@ class ECGNetLoader:
             self.model.eval()
             self.model_path = model_path
             
-            print(f"✓ ECGNet loaded from {os.path.basename(model_path)} (num_classes={num_classes})")
+            print(f"[OK] ECGNet loaded from {os.path.basename(model_path)} (num_classes={num_classes})")
             return True
             
         except Exception as e:
-            print(f"✗ Error loading ECGNet from {model_path}: {str(e)}")
+            print(f"[ERROR] Error loading ECGNet from {model_path}: {str(e)}")
             self.model = None
             return False
     
@@ -341,17 +341,17 @@ class ClassicalMLLoader:
             True if successful, False otherwise
         """
         if not JOBLIB_AVAILABLE:
-            print("✗ joblib not installed. Cannot load classical ML model.")
+            print("[ERROR] joblib not installed. Cannot load classical ML model.")
             return False
         
         try:
             self.model = joblib.load(model_path)
             self.model_path = model_path
-            print(f"✓ Classical ML model loaded from {os.path.basename(model_path)}")
+            print(f"[OK] Classical ML model loaded from {os.path.basename(model_path)}")
             return True
             
         except Exception as e:
-            print(f"✗ Error loading classical ML model: {str(e)}")
+            print(f"[ERROR] Error loading classical ML model: {str(e)}")
             self.model = None
             return False
     
@@ -588,7 +588,7 @@ def initialize_models(models_dir: str = None) -> Dict[str, bool]:
             break
     
     if not status['ecgnet']:
-        print(f"⚠ ECGNet model not found in {models_dir}")
+        print(f"[WARNING] ECGNet model not found in {models_dir}")
     
     # Load Classical ML model (Random Forest from joblib)
     classical_path = models_dir / 'classical_rf_model.joblib'
@@ -596,7 +596,7 @@ def initialize_models(models_dir: str = None) -> Dict[str, bool]:
         classical_ml_model = ClassicalMLLoader()
         status['classical_ml'] = classical_ml_model.load_model(str(classical_path))
     else:
-        print(f"⚠ Classical ML model not found: {classical_path}")
+        print(f"[WARNING] Classical ML model not found: {classical_path}")
     
     return status
 

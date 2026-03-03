@@ -34,17 +34,17 @@ class EEGService:
         biot_path = self.models_dir / 'eeg_biot_best.pt'
         if biot_path.exists():
             self.biot_loader = BIOTLoader(str(biot_path))
-            print("  ✓ BIOT model loaded")
+            print("  [OK] BIOT model loaded")
         else:
-            print(f"  ✗ BIOT model not found at {biot_path}")
+            print(f"  [ERROR] BIOT model not found at {biot_path}")
 
         # Random Forest model
         rf_path = self.models_dir / 'eeg_rf_model.joblib'
         if rf_path.exists():
             self.rf_loader = EEGRandomForestLoader(str(rf_path))
-            print("  ✓ Random Forest model loaded")
+            print("  [OK] Random Forest model loaded")
         else:
-            print(f"  ✗ Random Forest model not found at {rf_path}")
+            print(f"  [ERROR] Random Forest model not found at {rf_path}")
 
         print("="*60 + "\n")
 
@@ -70,7 +70,7 @@ class EEGService:
             msg = (f"Input has {n_leads} leads/channels. Models require exactly 18 — "
                    f"{n_leads - 18} extra lead(s) will be dropped in AI analysis.")
             warnings_list.append(msg)
-            print(f"⚠ {msg}")
+            print(f"[WARNING] {msg}")
 
         results = {}
         if warnings_list:

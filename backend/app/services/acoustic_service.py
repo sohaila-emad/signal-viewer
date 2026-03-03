@@ -12,7 +12,7 @@ from scipy import signal
 from ..models.acoustic_model import (
     generate_vehicle_passing_sound,
     analyze_vehicle_sound,
-    detect_drone_submarine,
+    detect_drone,
     DopplerEffectModel,
     VehicleSoundAnalyzer,
     DroneDetector
@@ -120,12 +120,12 @@ class AcousticService:
                                sample_rate: int = 44100,
                                vehicle_type: str = 'auto') -> dict:
         """
-        Detect drone or submarine sounds in audio.
-        
+        Detect drone sounds in audio.
+
         Args:
             audio_data: List of audio samples
             sample_rate: Sample rate in Hz
-            vehicle_type: 'auto', 'drone', or 'submarine'
+            vehicle_type: 'auto' or 'drone'
             
         Returns:
             Detection results
@@ -147,7 +147,7 @@ class AcousticService:
         if max_val > 1.0:
             audio_array = audio_array / max_val
         
-        result = detect_drone_submarine(audio_array.tolist(), sample_rate)
+        result = detect_drone(audio_array.tolist(), sample_rate)
         
         
         return result

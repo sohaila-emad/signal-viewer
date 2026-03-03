@@ -47,7 +47,11 @@ class MicrobiomeService:
     # ── Longitudinal timeline ─────────────────────────────────────────────────
 
     def get_longitudinal_data(self, participant_id: str, genera: List[str]) -> Dict:
-        visits = get_longitudinal_data(self._dataset, participant_id)
+        try:
+            visits = get_longitudinal_data(self._dataset, participant_id)
+        except Exception as e:
+            print(f"Error fetching longitudinal data for {participant_id}: {e}")
+            return {'error': f'Error fetching data for participant {participant_id}: {str(e)}'}
         if not visits:
             return {'error': f'No data for participant {participant_id!r}.'}
 
@@ -75,7 +79,11 @@ class MicrobiomeService:
     # ── Patient profile ───────────────────────────────────────────────────────
 
     def get_patient_profile(self, participant_id: str) -> Dict:
-        visits = get_longitudinal_data(self._dataset, participant_id)
+        try:
+            visits = get_longitudinal_data(self._dataset, participant_id)
+        except Exception as e:
+            print(f"Error fetching patient profile for {participant_id}: {e}")
+            return {'error': f'Error fetching data for participant {participant_id}: {str(e)}'}
         if not visits:
             return {'error': f'No data for participant {participant_id!r}.'}
 

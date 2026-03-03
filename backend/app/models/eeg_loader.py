@@ -17,7 +17,7 @@ try:
     BIOT_AVAILABLE = True
 except ImportError:
     BIOT_AVAILABLE = False
-    print("⚠ braindecode not installed. BIOT model will not be available.")
+    print("[WARNING] braindecode not installed. BIOT model will not be available.")
 
 # For classical ML
 try:
@@ -67,7 +67,7 @@ class BIOTLoader:
     def load_model(self, model_path: str) -> bool:
         """Load the fine‑tuned BIOT model from a .pt file."""
         if not BIOT_AVAILABLE:
-            print("✗ braindecode not installed. Cannot load BIOT model.")
+            print("[ERROR] braindecode not installed. Cannot load BIOT model.")
             return False
 
         try:
@@ -108,11 +108,11 @@ class BIOTLoader:
             self.model.to(self.device)
             self.model.eval()
             self.model_path = model_path
-            print(f"✓ BIOT model loaded from {os.path.basename(model_path)}")
+            print(f"[OK] BIOT model loaded from {os.path.basename(model_path)}")
             return True
 
         except Exception as e:
-            print(f"✗ Error loading BIOT model: {str(e)}")
+            print(f"[ERROR] Error loading BIOT model: {str(e)}")
             self.model = None
             return False
 
@@ -262,10 +262,10 @@ class EEGRandomForestLoader:
             return False
         try:
             self.model = joblib.load(model_path)
-            print(f"✓ Random Forest model loaded from {os.path.basename(model_path)}")
+            print(f"[OK] Random Forest model loaded from {os.path.basename(model_path)}")
             return True
         except Exception as e:
-            print(f"✗ Error loading Random Forest: {str(e)}")
+            print(f"[ERROR] Error loading Random Forest: {str(e)}")
             return False
 
     def extract_features(self, window: np.ndarray) -> np.ndarray:

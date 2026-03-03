@@ -70,6 +70,34 @@ const AIPrediction = ({ signalData }) => {
     );
   }
 
+  // Check if there's an error
+  if (prediction?.error) {
+    return (
+      <div style={{
+        padding: '20px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '8px',
+        marginTop: '20px'
+      }}>
+        <h3 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span>🤖</span> AI Analysis
+        </h3>
+        <div style={{
+          padding: '15px',
+          backgroundColor: '#ffebee',
+          borderRadius: '8px',
+          border: '1px solid #ef5350',
+          color: '#d32f2f'
+        }}>
+          <strong>⚠️ Prediction Unavailable</strong>
+          <div style={{ marginTop: '8px', fontSize: '14px' }}>
+            {prediction.error}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Check if using real models or synthetic
   const usingRealModels = prediction?.using_real_models;
   const isEnsemble = prediction?.using_real_models;
@@ -83,7 +111,7 @@ const AIPrediction = ({ signalData }) => {
     mainConfidence = comparison?.ensemble_confidence || 0;
     modelSource = 'Real Models (Ensemble)';
   } else {
-    // Use synthetic prediction
+    // Use synthetic prediction (fallback - should not reach here now)
     mainPrediction = prediction?.synthetic_ai?.prediction || 'Unknown';
     mainConfidence = prediction?.synthetic_ai?.confidence || 0;
     modelSource = 'Synthetic (Demo)';
